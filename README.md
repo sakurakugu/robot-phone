@@ -1,4 +1,4 @@
-这是一个新的 [**React Native**](https://reactnative.dev) 项目，使用 [`@react-native-community/cli`](https://github.com/react-native-community/cli) 初始化创建。
+目前只是初始化了仓库。
 
 # 快速开始
 
@@ -134,26 +134,3 @@ yarn ios
 - `checkAutomatically: "ON_LOAD"`: 应用每次启动时自动检查更新。
 - `fallbackToCacheTimeout: 0`: 若无法获取更新，则立即使用缓存版本（无等待超时）。
 - `runtimeVersion.policy: "sdkVersion"`: 使用 Expo SDK 版本作为运行时版本标识，确保更新兼容性。
-
-## 恭喜！🎉
-
-你已成功运行并修改了你的 React Native 应用！🥳
-
-### 接下来做什么？
-
-- 如果你想将此 React Native 代码集成到现有原生应用中，请查阅 [集成指南（Integration with Existing Apps）](https://reactnative.dev/docs/integration-with-existing-apps)。
-- 如果你想深入学习 React Native，请访问 [官方文档](https://reactnative.dev/docs/getting-started)。
-
-# 故障排查
-
-如果上述步骤遇到问题，请参考 [故障排查页面（Troubleshooting）](https://reactnative.dev/docs/troubleshooting)。
-
-# 深入学习
-
-想了解更多关于 React Native 的内容？可以查看以下资源：
-
-- [React Native 官网](https://reactnative.dev) —— 了解 React Native 的核心信息。
-- [环境搭建指南](https://reactnative.dev/docs/environment-setup) —— React Native 入门及环境配置概览。
-- [基础教程](https://reactnative.dev/docs/getting-started) —— React Native 基础知识的引导式学习。
-- [官方博客](https://reactnative.dev/blog) —— 阅读最新的 React Native 官方动态。
-- [`@facebook/react-native` GitHub 仓库](https://github.com/facebook/react-native) —— React Native 的开源代码库。
