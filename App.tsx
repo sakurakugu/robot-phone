@@ -3,10 +3,12 @@
  * 包含操作、聊天、管理、我的四个主要功能模块
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Platform, LogBox } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Updates from 'expo-updates';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // 导入各页面组件
@@ -51,6 +53,40 @@ function MainTabs() {
 }
 
 function App() {
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      checkForUpdates();
+    }
+  }, []);
+
+  const checkForUpdates = async () => {
+    try {
+      const update = await Updates.checkForUpdateAsync();
+
+      if (update.isAvailable) {
+        setUpdateMessage('发现新版本，正在更新...');
+        setIsUpdateAvailable(true);
+
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } else {
+        setUpdateMessage('已是最新版本');
+        setIsUpdateAvailable(false);
+      }
+    } catch (error) {
+      console.error('检查更新时出错:', error);
+      setUpdateMessage('更新检查失败');
+    }
+  };
+
+  // 在开发环境中禁用某些警告
+  if (__DEV__) {
+    LogBox.ignoreLogs(['Require cycle:']);
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>

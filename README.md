@@ -1,97 +1,159 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+这是一个新的 [**React Native**](https://reactnative.dev) 项目，使用 [`@react-native-community/cli`](https://github.com/react-native-community/cli) 初始化创建。
 
-# Getting Started
+# 快速开始
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+> **注意**：在继续之前，请确保你已完成官方的 [环境搭建指南（Set Up Your Environment）](https://reactnative.dev/docs/set-up-your-environment)。
 
-## Step 1: Start Metro
+## 第一步：启动 Metro
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+首先，你需要运行 **Metro** —— React Native 的 JavaScript 构建工具。
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+在项目根目录下运行以下命令以启动 Metro 开发服务器：
 
 ```sh
-# Using npm
+# 使用 npm
 npm start
 
-# OR using Yarn
+# 或使用 Yarn
 yarn start
 ```
 
-## Step 2: Build and run your app
+## 第二步：构建并运行你的应用
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+在 Metro 启动后，打开一个新的终端窗口（或标签页），进入项目根目录，并根据你的目标平台运行以下命令之一：
 
 ### Android
 
 ```sh
-# Using npm
+# 使用 npm
 npm run android
 
-# OR using Yarn
+# 或使用 Yarn
 yarn android
 ```
 
 ### iOS
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+对于 iOS 平台，请记得先安装 CocoaPods 依赖项（仅需在首次克隆项目或更新原生依赖后执行）。
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+首次创建新项目时，请先运行 Ruby Bundler 安装 CocoaPods 本身：
 
 ```sh
 bundle install
 ```
 
-Then, and every time you update your native dependencies, run:
+然后，在每次更新原生依赖后，运行：
 
 ```sh
 bundle exec pod install
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+更多详情请参阅 [CocoaPods 入门指南](https://guides.cocoapods.org/using/getting-started.html)。
+
+接着，运行以下命令启动 iOS 应用：
 
 ```sh
-# Using npm
+# 使用 npm
 npm run ios
 
-# OR using Yarn
+# 或使用 Yarn
 yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+如果一切配置正确，你将看到你的新应用在 Android 模拟器、iOS 模拟器或已连接的真实设备上成功运行。
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+除了使用命令行方式，你也可以直接通过 Android Studio 或 Xcode 构建并运行应用。
 
-## Step 3: Modify your app
+## 第三步：修改你的应用
 
-Now that you have successfully run the app, let's make changes!
+现在你已经成功运行了应用，接下来可以尝试修改它！
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+用你喜欢的代码编辑器打开 `App.tsx` 文件并进行任意修改。保存文件后，应用会自动刷新并立即反映你的更改 —— 这是由 [Fast Refresh](https://reactnative.dev/docs/fast-refresh) 功能实现的。
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+如果你需要强制重新加载（例如重置应用状态），可以执行完整重载：
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+- **Android**：快速按两次  键，或通过快捷键打开开发者菜单（Windows/Linux 上为  + ，macOS 上为  + ），然后选择 **“Reload”**。
+- **iOS**：在 iOS 模拟器中按下  键。
 
-## Congratulations! :tada:
+## 热更新功能
 
-You've successfully run and modified your React Native App. :partying_face:
+本应用集成了 Expo Updates 热更新功能，支持在不重新发布应用的情况下推送 JavaScript 代码和资源更新。
 
-### Now what?
+### 热更新配置
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+应用在启动时会自动检查是否有可用更新。如果发现新版本，会自动下载并在下次启动时应用。
 
-# Troubleshooting
+### 在开发环境中使用热更新
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+1. **启动开发服务器**：
+   ```bash
+   npm start
+   ```
 
-# Learn More
+2. **在设备上运行应用**：
+   ```bash
+   npm run android  # Android
+   npm run ios      # iOS
+   ```
 
-To learn more about React Native, take a look at the following resources:
+3. **向设备推送更新**：
+   在开发过程中，当你修改代码并保存时，应用会通过 Fast Refresh 自动更新。
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+   若要模拟完整的热更新流程（例如测试生产环境行为），可运行：
+   ```bash
+   npx expo publish
+   ```
+
+### 生产环境热更新
+
+在生产环境中，应用会按以下顺序处理更新：
+1. 启动时检查远程是否有新版本；
+2. 如果有，则在后台下载更新；
+3. 下次启动时自动应用新版本。
+
+### 热更新配置说明
+
+热更新的行为由 `app.json` 文件中的以下配置控制：
+
+```json
+{
+  "expo": {
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  }
+}
+```
+
+- `enabled`: 启用热更新功能。
+- `checkAutomatically: "ON_LOAD"`: 应用每次启动时自动检查更新。
+- `fallbackToCacheTimeout: 0`: 若无法获取更新，则立即使用缓存版本（无等待超时）。
+- `runtimeVersion.policy: "sdkVersion"`: 使用 Expo SDK 版本作为运行时版本标识，确保更新兼容性。
+
+## 恭喜！🎉
+
+你已成功运行并修改了你的 React Native 应用！🥳
+
+### 接下来做什么？
+
+- 如果你想将此 React Native 代码集成到现有原生应用中，请查阅 [集成指南（Integration with Existing Apps）](https://reactnative.dev/docs/integration-with-existing-apps)。
+- 如果你想深入学习 React Native，请访问 [官方文档](https://reactnative.dev/docs/getting-started)。
+
+# 故障排查
+
+如果上述步骤遇到问题，请参考 [故障排查页面（Troubleshooting）](https://reactnative.dev/docs/troubleshooting)。
+
+# 深入学习
+
+想了解更多关于 React Native 的内容？可以查看以下资源：
+
+- [React Native 官网](https://reactnative.dev) —— 了解 React Native 的核心信息。
+- [环境搭建指南](https://reactnative.dev/docs/environment-setup) —— React Native 入门及环境配置概览。
+- [基础教程](https://reactnative.dev/docs/getting-started) —— React Native 基础知识的引导式学习。
+- [官方博客](https://reactnative.dev/blog) —— 阅读最新的 React Native 官方动态。
+- [`@facebook/react-native` GitHub 仓库](https://github.com/facebook/react-native) —— React Native 的开源代码库。
