@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useRobotControl, { Robot } from '../hooks/useRobotControl';
 
@@ -12,9 +19,9 @@ const OperationScreen = () => {
     robotActions,
     selectRobot,
     sendAction,
-    testConnection
+    testConnection,
   } = useRobotControl();
-  
+
   const [controlMode, setControlMode] = useState<'move' | 'pose'>('move');
 
   const handleRobotSelection = (robot: Robot) => {
@@ -26,22 +33,18 @@ const OperationScreen = () => {
   };
 
   const handleEmergencyStop = () => {
-    Alert.alert(
-      '紧急停止',
-      '确定要发送紧急停止命令吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        { 
-          text: '确定', 
-          onPress: () => {
-            // 发送紧急停止命令
-            if (selectedRobot) {
-              sendAction('emergency_stop');
-            }
+    Alert.alert('紧急停止', '确定要发送紧急停止命令吗？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '确定',
+        onPress: () => {
+          // 发送紧急停止命令
+          if (selectedRobot) {
+            sendAction('emergency_stop');
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   return (
@@ -49,31 +52,37 @@ const OperationScreen = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>机器人操作</Text>
       </View>
-      
+
       <ScrollView style={styles.content}>
         {/* 机器人选择 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>选择机器人</Text>
           <View style={styles.robotSelector}>
-            {robots.map((robot) => (
-              <TouchableOpacity 
-                key={robot.id} 
+            {robots.map(robot => (
+              <TouchableOpacity
+                key={robot.id}
                 style={[
-                  styles.robotOption, 
-                  selectedRobot?.id === robot.id && styles.selectedRobot
+                  styles.robotOption,
+                  selectedRobot?.id === robot.id && styles.selectedRobot,
                 ]}
                 onPress={() => handleRobotSelection(robot)}
               >
-                <Text style={[
-                  styles.robotText,
-                  selectedRobot?.id === robot.id && styles.selectedRobotText
-                ]}>
+                <Text
+                  style={[
+                    styles.robotText,
+                    selectedRobot?.id === robot.id && styles.selectedRobotText,
+                  ]}
+                >
                   {robot.name}
                 </Text>
-                <Text style={[
-                  styles.robotStatus,
-                  { color: robot.status === 'online' ? '#4CAF50' : '#F44336' }
-                ]}>
+                <Text
+                  style={[
+                    styles.robotStatus,
+                    {
+                      color: robot.status === 'online' ? '#4CAF50' : '#F44336',
+                    },
+                  ]}
+                >
                   {robot.status === 'online' ? '在线' : '离线'}
                 </Text>
               </TouchableOpacity>
@@ -85,29 +94,37 @@ const OperationScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>控制模式</Text>
           <View style={styles.modeSelector}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.modeButton, 
-                controlMode === 'move' && styles.activeMode
+                styles.modeButton,
+                controlMode === 'move' && styles.activeMode,
               ]}
               onPress={() => setControlMode('move')}
             >
-              <Text style={[
-                styles.modeButtonText,
-                controlMode === 'move' && styles.activeModeText
-              ]}>移动</Text>
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  controlMode === 'move' && styles.activeModeText,
+                ]}
+              >
+                移动
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.modeButton, 
-                controlMode === 'pose' && styles.activeMode
+                styles.modeButton,
+                controlMode === 'pose' && styles.activeMode,
               ]}
               onPress={() => setControlMode('pose')}
             >
-              <Text style={[
-                styles.modeButtonText,
-                controlMode === 'pose' && styles.activeModeText
-              ]}>姿态</Text>
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  controlMode === 'pose' && styles.activeModeText,
+                ]}
+              >
+                姿态
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -115,12 +132,12 @@ const OperationScreen = () => {
         {/* 摇杆控制区域 */}
         <View style={styles.controlSection}>
           <Text style={styles.sectionTitle}>控制面板</Text>
-          
+
           <View style={styles.joystickContainer}>
             <View style={styles.leftJoystick}>
               <Text style={styles.joystickLabel}>移动控制</Text>
             </View>
-            
+
             <View style={styles.rightJoystick}>
               <Text style={styles.joystickLabel}>视角控制</Text>
             </View>
@@ -131,9 +148,9 @@ const OperationScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>动作控制</Text>
           <View style={styles.actionButtons}>
-            {robotActions.slice(0, 6).map((action) => (
-              <TouchableOpacity 
-                key={action.id} 
+            {robotActions.slice(0, 6).map(action => (
+              <TouchableOpacity
+                key={action.id}
                 style={styles.actionButton}
                 onPress={() => handleActionPress(action.command)}
               >
@@ -152,14 +169,22 @@ const OperationScreen = () => {
           </View>
           <View style={styles.statusItem}>
             <Text style={styles.statusText}>
-              连接状态: {selectedRobot ? (selectedRobot.status === 'online' ? '在线' : '离线') : '未选择'}
+              连接状态:{' '}
+              {selectedRobot
+                ? selectedRobot.status === 'online'
+                  ? '在线'
+                  : '离线'
+                : '未选择'}
             </Text>
           </View>
         </View>
 
         {/* 急停按钮 */}
         <View style={styles.emergencySection}>
-          <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyStop}>
+          <TouchableOpacity
+            style={styles.emergencyButton}
+            onPress={handleEmergencyStop}
+          >
             <Text style={styles.emergencyButtonText}>急停</Text>
           </TouchableOpacity>
         </View>
