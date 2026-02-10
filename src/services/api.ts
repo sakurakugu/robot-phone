@@ -1,5 +1,5 @@
 // src/services/api.ts
-const BASE_URL = 'http://localhost:3000/api'; // 根据实际后端地址调整
+const BASE_URL = 'http://localhost:9000/api'; // 根据实际后端地址调整
 
 class ApiService {
   private baseUrl: string;
