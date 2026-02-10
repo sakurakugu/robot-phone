@@ -23,7 +23,7 @@ eclipse.preferences.version=1
 """
 
 
-def is_gradle_project(directory: Path) -> bool:
+def 检测是否是gradle项目(directory: Path) -> bool:
     """判断目录是否是 Gradle 项目"""
     gradle_files = [
         'build.gradle',
@@ -34,7 +34,7 @@ def is_gradle_project(directory: Path) -> bool:
     return any((directory / gradle_file).exists() for gradle_file in gradle_files)
 
 
-def create_buildship_config(directory: Path, dry_run: bool = False) -> bool:
+def 创建buildship配置文件(directory: Path, dry_run: bool = False) -> bool:
     """为指定目录创建 Buildship 配置文件"""
     settings_dir = directory / '.settings'
     prefs_file = settings_dir / 'org.eclipse.buildship.core.prefs'
@@ -61,7 +61,7 @@ def create_buildship_config(directory: Path, dry_run: bool = False) -> bool:
         return False
 
 
-def scan_and_fix_gradle_projects(root_path: Path, dry_run: bool = False) -> tuple[int, int]:
+def 扫描并修复gradle项目(root_path: Path, dry_run: bool = False) -> tuple[int, int]:
     """扫描并修复目录下的所有 Gradle 项目"""
     fixed_count = 0
     total_gradle_projects = 0
@@ -82,15 +82,15 @@ def scan_and_fix_gradle_projects(root_path: Path, dry_run: bool = False) -> tupl
         dirnames[:] = [d for d in dirnames if d not in skip_dirs]
 
         # 检查是否是 Gradle 项目
-        if is_gradle_project(current_dir):
+        if 检测是否是gradle项目(current_dir):
             total_gradle_projects += 1
-            if create_buildship_config(current_dir, dry_run):
+            if 创建buildship配置文件(current_dir, dry_run):
                 fixed_count += 1
 
     return fixed_count, total_gradle_projects
 
 
-def fix_react_native_gradle_plugin(workspace_root: Path, dry_run: bool = False) -> int:
+def 修复react_native_gradle_plugin(workspace_root: Path, dry_run: bool = False) -> int:
     """专门修复 React Native Gradle Plugin 的配置问题"""
     fixed_count = 0
 
@@ -105,7 +105,7 @@ def fix_react_native_gradle_plugin(workspace_root: Path, dry_run: bool = False) 
         if full_path.exists():
             print(f"\n检查 React Native Gradle Plugin: {full_path}")
             print("-" * 60)
-            count, _ = scan_and_fix_gradle_projects(full_path, dry_run)
+            count, _ = 扫描并修复gradle项目(full_path, dry_run)
             fixed_count += count
 
     return fixed_count
@@ -154,8 +154,8 @@ def main():
     if args.workspace:
         workspace_root = Path(args.workspace).resolve()
     else:
-        # 脚本在 tools 目录下，工作区根目录是上级目录
-        workspace_root = Path(__file__).parent.parent.resolve()
+        # 脚本在 tools/scripts/fix 目录下，工作区根目录是上级目录
+        workspace_root = Path(__file__).parent.parent.parent.parent.resolve()
 
     if not workspace_root.exists():
         print(f"错误: 工作区目录不存在: {workspace_root}", file=sys.stderr)
@@ -179,15 +179,15 @@ def main():
             print(f"错误: 目录不存在: {target_path}", file=sys.stderr)
             sys.exit(1)
 
-        fixed_count, total_count = scan_and_fix_gradle_projects(target_path, args.dry_run)
+        fixed_count, total_count = 扫描并修复gradle项目(target_path, args.dry_run)
 
     elif args.scan_all:
         # 扫描整个工作区
-        fixed_count, total_count = scan_and_fix_gradle_projects(workspace_root, args.dry_run)
+        fixed_count, total_count = 扫描并修复gradle项目(workspace_root, args.dry_run)
 
     else:
         # 默认：修复 React Native Gradle Plugin
-        fixed_count = fix_react_native_gradle_plugin(workspace_root, args.dry_run)
+        fixed_count = 修复react_native_gradle_plugin(workspace_root, args.dry_run)
         total_count = fixed_count  # 在这个模式下只统计修复的数量
 
     # 输出结果
