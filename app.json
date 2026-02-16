@@ -1,34 +1,4 @@
 {
-  "expo": {
-    "name": "RobotPhone",
-    "slug": "robot-phone",
-    "version": "1.0.0",
-    "platforms": [
-      "ios",
-      "android"
-    ],
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "updates": {
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
-    },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
-    },
-    "plugins": [
-      "expo-updates"
-    ]
-  }
+  "name": "RobotPhone",
+  "displayName": "RobotPhone"
 }
