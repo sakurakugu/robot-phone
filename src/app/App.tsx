@@ -11,8 +11,8 @@ import { AppPreferencesProvider, useAppPreferences } from './preferences/AppPref
 import { usePalette } from './theme/palette';
 
 function AppContent() {
-  const { themeMode } = useAppPreferences();
-  const isDarkMode = themeMode === 'dark';
+  const { activeThemeMode } = useAppPreferences();
+  const isDarkMode = activeThemeMode === 'dark';
   const palette = usePalette();
 
   const navigationTheme = isDarkMode

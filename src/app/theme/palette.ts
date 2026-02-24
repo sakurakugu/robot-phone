@@ -40,6 +40,6 @@ const darkPalette: Palette = {
 };
 
 export function usePalette(): Palette {
-  const { themeMode } = useAppPreferences();
-  return themeMode === 'dark' ? darkPalette : lightPalette;
+  const { activeThemeMode } = useAppPreferences();
+  return activeThemeMode === 'dark' ? darkPalette : lightPalette;
 }

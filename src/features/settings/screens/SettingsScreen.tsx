@@ -58,6 +58,20 @@ export function SettingsScreen() {
               深色模式
             </Text>
           </Pressable>
+          <Pressable
+            onPress={() => setThemeMode('system')}
+            style={[
+              styles.themeBtn,
+              {
+                borderColor: themeMode === 'system' ? palette.primary : palette.border,
+                backgroundColor: themeMode === 'system' ? palette.surfaceAlt : palette.surface,
+              },
+            ]}
+          >
+            <Text style={{ color: themeMode === 'system' ? palette.primary : palette.textMuted }}>
+              跟随系统
+            </Text>
+          </Pressable>
         </View>
       </View>
 
