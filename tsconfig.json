@@ -1,6 +1,6 @@
 {
   "extends": "@react-native/typescript-config",
-  "compilerOptions": {
+  "compilerOptions": { // 这个保存是react-native内部的es2020.data，不用管他
     "types": ["jest"]
   },
   "include": ["**/*.ts", "**/*.tsx"],
