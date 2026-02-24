@@ -85,7 +85,7 @@ export function RobotSettingsScreen() {
     [robot?.name, robotName, robotUuid],
   );
 
-  const inputStyle = [styles.input, { borderColor: palette.border, color: palette.text }] as const;
+  const inputStyle = [styles.input, { borderColor: palette.border, color: palette.text }];
 
   async function handleSaveBasic() {
     const payload: RobotForm = {

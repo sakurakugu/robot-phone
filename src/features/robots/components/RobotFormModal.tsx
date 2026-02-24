@@ -77,7 +77,7 @@ export function RobotFormModal({
     }
   }
 
-  const inputStyle = [styles.input, { borderColor: palette.border, color: palette.text }] as const;
+  const inputStyle = [styles.input, { borderColor: palette.border, color: palette.text }];
   const placeholderTextColor = palette.textMuted;
 
   return (

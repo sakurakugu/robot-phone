@@ -7,6 +7,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Bot, Smartphone } from 'lucide-react-native';
+import { getBatteryLevel } from 'react-native-device-info';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { capturePhoto } from '../api';
@@ -39,7 +41,8 @@ export function RobotOperationScreen() {
   const [showVideo, setShowVideo] = useState(true);
   const [speed, setSpeed] = useState(5);
   const [micEnabled, setMicEnabled] = useState(true);
-  const [battery] = useState(85);
+  const [battery] = useState<number | null>(null);
+  const [phoneBattery, setPhoneBattery] = useState<number | null>(null);
   const [statusText, setStatusText] = useState('');
   const [capturing, setCapturing] = useState(false);
   const [photoUri, setPhotoUri] = useState('');
@@ -51,7 +54,19 @@ export function RobotOperationScreen() {
     const timer = setInterval(() => {
       setTimeText(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
     }, 1000);
-    return () => clearInterval(timer);
+
+    const updatePhoneBattery = () => {
+      getBatteryLevel().then((level) => {
+        setPhoneBattery(Math.round(level * 100));
+      });
+    };
+    updatePhoneBattery();
+    const batteryTimer = setInterval(updatePhoneBattery, 60000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(batteryTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -130,7 +145,14 @@ export function RobotOperationScreen() {
         </View>
         <View style={styles.rightInfo}>
           <Text style={styles.infoText}>{headerText}</Text>
-          <Text style={styles.infoText}>电量 {battery}%</Text>
+          <View style={styles.batteryInfo}>
+            <Bot size={14} color="#DCE7FF" />
+            <Text style={styles.infoText}>{battery !== null ? `${battery}%` : '--'}</Text>
+          </View>
+          <View style={styles.batteryInfo}>
+            <Smartphone size={14} color="#DCE7FF" />
+            <Text style={styles.infoText}>{phoneBattery !== null ? `${phoneBattery}%` : '--'}</Text>
+          </View>
           <Text style={styles.infoText}>{timeText}</Text>
         </View>
       </View>
@@ -247,6 +269,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingLeft: 8,
+  },
+  batteryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   infoText: {
     color: '#DCE7FF',
