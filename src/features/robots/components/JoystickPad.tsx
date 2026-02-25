@@ -13,7 +13,7 @@ type JoystickProps = {
 };
 
 /**
- * 模拟摇杆 —— 仿 JoystickPad.vue
+ * 模拟摇杆 —— 仿 app\robot-cloud\前端\src\components\JoystickPad.vue
  * 坐标约定：上为 +x，左为 +y
  */
 export function JoystickPad({ onMove, onEnd }: JoystickProps) {
@@ -39,13 +39,29 @@ export function JoystickPad({ onMove, onEnd }: JoystickProps) {
         onMove?.({ x: nx, y: ny });
       },
       onPanResponderRelease: () => {
-        Animated.spring(animX, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
-        Animated.spring(animY, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
+        Animated.spring(animX, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 30,
+        }).start();
+        Animated.spring(animY, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 30,
+        }).start();
         onEnd?.();
       },
       onPanResponderTerminate: () => {
-        Animated.spring(animX, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
-        Animated.spring(animY, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
+        Animated.spring(animX, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 30,
+        }).start();
+        Animated.spring(animY, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 30,
+        }).start();
         onEnd?.();
       },
     }),
