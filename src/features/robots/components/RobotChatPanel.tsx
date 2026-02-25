@@ -1,0 +1,581 @@
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  // BrainCircuit,
+  Bot,
+  Send
+} from 'lucide-react-native';
+import { usePalette } from '../../../app/theme/palette';
+import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
+
+export type MessageTarget = 'ai' | 'robot';
+
+export type RobotChatMessage = {
+  id: string;
+  /** 'user' = 用户发出；'ai' = 服务器/AI 回复 */
+  role: 'user' | 'ai';
+  target?: MessageTarget;
+  text: string;
+  timestamp: number;
+  actions?: string[];
+  /** 等待服务器回复中 */
+  loading?: boolean;
+};
+
+type RobotChatPanelProps = {
+  robotUuid: string;
+  robotName?: string;
+  showStatusHeader?: boolean;
+};
+
+/** 解析动作格式 {{action=xxx}} 或 {{action=xxx,param=value}} */
+function parseActionFormat(
+  text: string,
+): { action: string; parameters: Record<string, any> } | null {
+  const actionRegex =
+    /^\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}$/;
+  const match = text.match(actionRegex);
+  if (!match) return null;
+
+  const action = match[1];
+  const paramsStr = match[2];
+  const parameters: Record<string, any> = {};
+
+  if (paramsStr) {
+    const paramPairs = paramsStr.slice(1).split(',');
+    for (const pair of paramPairs) {
+      const [key, value] = pair.split('=');
+      if (key && value !== undefined) {
+        parameters[key.trim()] = isNaN(Number(value)) ? value : Number(value);
+      }
+    }
+  }
+  return { action, parameters };
+}
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '00');
+  return `${hh}:${mm}:${ss}`;
+}
+
+/**
+ * 机器人聊天面板 —— 自包含 WebSocket 连接 + 聊天 UI
+ * 可嵌入到 Screen 全屏页面或 ChatDrawer 抽屉中
+ */
+export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false }: RobotChatPanelProps) {
+  const palette = usePalette();
+
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<RobotChatMessage[]>([]);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  const {
+    isConnected,
+    connect,
+    disconnect,
+    sendToAI,
+    sendToRobot,
+    sendAction,
+    onMessage,
+  } = useRobotWebSocket();
+
+  const statusText = useMemo(() => {
+    const status = isConnected ? '已连接' : '未连接';
+    return `${robotName || '未命名机器人'} · ${status}`;
+  }, [robotName, isConnected]);
+
+  // 连接 / 断连
+  useEffect(() => {
+    if (robotUuid) {
+      connect(robotUuid);
+    }
+    return () => {
+      disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotUuid]);
+
+  // 键盘事件监听
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardOffset(e.endCoordinates.height);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardOffset(0);
+      },
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // 注册消息处理
+  useEffect(() => {
+    const unsubscribe = onMessage(data => {
+      if (data.type === 'asr_transcript') {
+        const ts = Date.now();
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `asr-${ts}`,
+            role: 'user',
+            target: 'ai',
+            text: data.data?.text || '',
+            timestamp: ts,
+          },
+        ]);
+        return;
+      }
+
+      if (data.type === 'text_response') {
+        const ts = Date.now();
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.loading);
+          return [
+            ...filtered,
+            {
+              id: `ai-${ts}`,
+              role: 'ai',
+              text: data.data?.text || '',
+              timestamp: ts,
+              actions: data.data?.actions,
+            },
+          ];
+        });
+        return;
+      }
+
+      if (data.type === 'error') {
+        if (
+          data.data?.code === 'ASR_ERROR' ||
+          String(data.data?.message || '').includes('Opus解码失败')
+        ) {
+          return;
+        }
+        const ts = Date.now();
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.loading);
+          return [
+            ...filtered,
+            {
+              id: `err-${ts}`,
+              role: 'ai',
+              text: `发生错误：${data.data?.message || '未知错误'}`,
+              timestamp: ts,
+            },
+          ];
+        });
+      }
+    });
+    return unsubscribe;
+  }, [onMessage]);
+
+  // 消息变化时滚动到底部
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(
+        () => flatListRef.current?.scrollToEnd({ animated: true }),
+        100,
+      );
+    }
+  }, [messages.length]);
+
+  const handleSend = useCallback(
+    (target: MessageTarget) => {
+      const text = input.trim();
+      if (!text || !isConnected) return;
+
+      const ts = Date.now();
+      const actionMatch = parseActionFormat(text);
+
+      if (actionMatch) {
+        // 动作格式 —— 直接发送 action_input
+        const userMsg: RobotChatMessage = {
+          id: `user-${ts}`,
+          role: 'user',
+          target: 'robot',
+          text,
+          timestamp: ts,
+          actions: [actionMatch.action],
+        };
+        setMessages(prev => [...prev, userMsg]);
+        sendAction(actionMatch.action, actionMatch.parameters);
+      } else if (target === 'robot') {
+        // 直接合成 TTS 推送到机器狗
+        const userMsg: RobotChatMessage = {
+          id: `user-${ts}`,
+          role: 'user',
+          target: 'robot',
+          text,
+          timestamp: ts,
+        };
+        setMessages(prev => [...prev, userMsg]);
+        sendToRobot(text);
+      } else {
+        // 发给大模型
+        const userMsg: RobotChatMessage = {
+          id: `user-${ts}`,
+          role: 'user',
+          target: 'ai',
+          text,
+          timestamp: ts,
+        };
+        const loadingMsg: RobotChatMessage = {
+          id: `loading-${ts}`,
+          role: 'ai',
+          text: '',
+          timestamp: ts,
+          loading: true,
+        };
+        setMessages(prev => [...prev, userMsg, loadingMsg]);
+        sendToAI(text);
+      }
+
+      setInput('');
+    },
+    [input, isConnected, sendAction, sendToAI, sendToRobot],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: RobotChatMessage }) => {
+      const isUser = item.role === 'user';
+      // 发给机器人的消息显示在左侧
+      const isRight = isUser && item.target !== 'robot';
+
+      if (item.loading) {
+        return (
+          <View style={[styles.bubbleRow, styles.bubbleRowLeft]}>
+            <View
+              style={[
+                styles.bubble,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                  borderWidth: 1,
+                },
+              ]}
+            >
+              <ActivityIndicator size="small" color={palette.primary} />
+            </View>
+          </View>
+        );
+      }
+
+      return (
+        <View
+          style={[
+            styles.bubbleRow,
+            isRight ? styles.bubbleRowRight : styles.bubbleRowLeft,
+          ]}
+        >
+          <View
+            style={[
+              styles.bubble,
+              isRight
+                ? { backgroundColor: palette.primary }
+                : {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                  borderWidth: 1,
+                },
+            ]}
+          >
+            <View style={styles.bubbleMeta}>
+              <Text
+                style={[
+                  styles.metaLabel,
+                  {
+                    color: isRight ? 'rgba(255,255,255,0.7)' : palette.textMuted,
+                  },
+                ]}
+              >
+                {isUser
+                  ? item.target === 'ai'
+                    ? '用户 → AI'
+                    : '用户 → 机器狗'
+                  : 'AI助手'}
+              </Text>
+              <Text
+                style={[
+                  styles.metaTime,
+                  {
+                    color: isRight ? 'rgba(255,255,255,0.6)' : palette.textMuted,
+                  },
+                ]}
+              >
+                {formatTime(item.timestamp)}
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: isRight ? '#FFFFFF' : palette.text,
+                lineHeight: 20,
+              }}
+            >
+              {item.text}
+            </Text>
+            {item.actions && item.actions.length > 0 && (
+              <View style={styles.actionTags}>
+                <Text
+                  style={[
+                    styles.actionLabel,
+                    {
+                      color: isRight
+                        ? 'rgba(255,255,255,0.7)'
+                        : palette.textMuted,
+                    },
+                  ]}
+                >
+                  ⚡ {item.actions.join(', ')}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    },
+    [palette],
+  );
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={keyboardOffset > 0 ? 90 : 0} // 键盘弹出时偏移 90，否则为 0
+    >
+      {/* 顶部状态栏 */}
+      {showStatusHeader && (
+        <View
+          style={[styles.statusHeader, { borderBottomColor: palette.border }]}
+        >
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: isConnected ? palette.success : palette.textMuted },
+            ]}
+          />
+          <Text style={[styles.statusText, { color: palette.textMuted }]}>
+            {statusText}
+          </Text>
+          {!isConnected && (
+            <ActivityIndicator
+              size="small"
+              color={palette.primary}
+              style={{ marginLeft: 6 }}
+            />
+          )}
+        </View>
+      )}
+
+      {messages.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, { color: palette.textMuted }]}>
+            还没有对话记录，发送一条消息开始吧！
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={renderItem}
+        />
+      )}
+
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: palette.border,
+            backgroundColor: palette.surface,
+          },
+        ]}
+      >
+        <TextInput
+          style={[
+            styles.input,
+            { borderColor: palette.border, color: palette.text },
+          ]}
+          placeholder="输入消息... (支持 {{action=xxx}} 格式)"
+          placeholderTextColor={palette.textMuted}
+          value={input}
+          onChangeText={setInput}
+          multiline
+          numberOfLines={2}
+        />
+        <View style={styles.btnGroup}>
+          <Pressable
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: palette.success,
+                opacity: !isConnected || !input.trim() ? 0.5 : 1,
+              },
+            ]}
+            disabled={!isConnected || !input.trim()}
+            onPress={() => handleSend('robot')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {/* <Text style={styles.sendBtnText}>发给</Text> */}
+              <Bot size={14} color="#FFFFFF" />
+            </View>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: palette.primary,
+                opacity: !isConnected || !input.trim() ? 0.5 : 1,
+              },
+            ]}
+            disabled={!isConnected || !input.trim()}
+            onPress={() => handleSend('ai')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {/* <Text style={styles.sendBtnText}>发给</Text> */}
+              <Send size={14} color="#FFFFFF" />
+              {/* <View style={{ transform: [{ rotate: '90deg' }] }}>
+                <BrainCircuit size={14} color="#FFFFFF" />
+              </View> */}
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  bubbleRow: {
+    flexDirection: 'row',
+  },
+  bubbleRowRight: {
+    justifyContent: 'flex-end',
+  },
+  bubbleRowLeft: {
+    justifyContent: 'flex-start',
+  },
+  bubble: {
+    maxWidth: '80%',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  bubbleMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  metaTime: {
+    fontSize: 10,
+  },
+  actionTags: {
+    marginTop: 6,
+  },
+  actionLabel: {
+    fontSize: 11,
+  },
+  footer: {
+    flexDirection: 'row',
+    // alignItems: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    padding: 10,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    maxHeight: 80,
+  },
+  btnGroup: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  sendBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  sendBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+});

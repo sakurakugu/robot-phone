@@ -17,9 +17,10 @@ import {
   View,
 } from 'react-native';
 import { getBatteryLevel } from 'react-native-device-info';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
-import { ChatDrawer, ChatMessage } from '../components/ChatDrawer';
+import { usePalette } from '../../../app/theme/palette';
+import { ChatDrawer } from '../components/ChatDrawer';
 import { JoystickPad } from '../components/JoystickPad';
 import { RtspVideoPlayer } from '../components/RtspVideoPlayer';
 import {
@@ -51,7 +52,9 @@ const ACTION_BUTTONS = [
 
 // ─── Screen ───────────────────────────────────────────────────────────────
 export function RobotOperationScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const palette = usePalette();
   const { setHomeOrientation } = useAppPreferences();
   const route = useRoute<any>();
   const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
@@ -64,21 +67,18 @@ export function RobotOperationScreen() {
   const [phoneBattery, setPhoneBattery] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'robot', text: '你好，我已准备好接收指令。' },
-  ]);
 
   // 连接机器狗得到遥测（电量、体温、在线状态）
   const dogTelemetry = useRobotTelemetry(robotIp, 3000);
 
   // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
-  const dogOnlineColor = dogTelemetry.online ? '#44D187' : '#90A5C3';
+  const dogOnlineColor = dogTelemetry.online ? palette.success : palette.textMuted;
   const dogPowerColor =
     dogTelemetry.power !== null && dogTelemetry.power <= 20
-      ? '#FF7676'
+      ? palette.danger
       : dogTelemetry.power !== null && dogTelemetry.power <= 50
-        ? '#FFB566'
-        : '#DCE7FF';
+        ? palette.warning
+        : palette.text;
 
   // ── 弹幕状态 ─────────────────────────────────────────────────────────────
   const [danmakuMessages, setDanmakuMessages] = useState<DanmakuItem[]>([]);
@@ -173,27 +173,28 @@ export function RobotOperationScreen() {
     navigation.goBack();
   }
 
-  // ── 聊天 ──────────────────────────────────────────────────────────────────
-  function handleChatSend(text: string) {
-    const userMsg: ChatMessage = { id: `${Date.now()}_u`, role: 'user', text };
-    const robotMsg: ChatMessage = {
-      id: `${Date.now()}_r`,
-      role: 'robot',
-      text: `已收到：${text}`,
-    };
-    setChatMessages(prev => [...prev, userMsg, robotMsg]);
-    sendControl(`指令：${text}`);
-  }
-
   const headerText = robotName || '未命名机器人';
 
   return (
-    <SafeAreaView style={styles.page} edges={['left', 'right', 'bottom']}>
+    <View style={[styles.page, { backgroundColor: palette.background }]}>
       {/* ── 顶部工具栏 ────────────────────────────────────────────────────── */}
-      <View style={styles.topBar}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            borderBottomColor: palette.border,
+            backgroundColor: palette.surface,
+            paddingLeft: 10 + insets.left,
+            paddingRight: 10 + insets.right,
+          },
+        ]}
+      >
         <View style={styles.leftTools}>
-          <Pressable onPress={handleGoBack} style={styles.smallBtn}>
-            <ArrowLeft size={16} color="#DCE7FF" />
+          <Pressable
+            onPress={handleGoBack}
+            style={[styles.smallBtn, { borderColor: palette.border }]}
+          >
+            <ArrowLeft size={16} color={palette.text} />
           </Pressable>
 
           <ToggleSwitch
@@ -213,20 +214,24 @@ export function RobotOperationScreen() {
           <View style={styles.speedBox}>
             <Pressable
               onPress={() => setSpeed(v => Math.max(1, v - 1))}
-              style={styles.speedBtn}
+              style={[styles.speedBtn, { borderColor: palette.border }]}
             >
-              <Text style={styles.btnText}>-</Text>
+              <Text style={[styles.btnText, { color: palette.text }]}>-</Text>
             </Pressable>
-            <Text style={styles.speedText}>速度 {speed}</Text>
+            <Text style={[styles.speedText, { color: palette.text }]}>
+              速度 {speed}
+            </Text>
             <Pressable
               onPress={() => setSpeed(v => Math.min(10, v + 1))}
-              style={styles.speedBtn}
+              style={[styles.speedBtn, { borderColor: palette.border }]}
             >
-              <Text style={styles.btnText}>+</Text>
+              <Text style={[styles.btnText, { color: palette.text }]}>+</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.switchLabel}>视频</Text>
+          <Text style={[styles.switchLabel, { color: palette.text }]}>
+            视频
+          </Text>
           <ToggleSwitch
             value={showVideo}
             onValueChange={setShowVideo}
@@ -237,38 +242,52 @@ export function RobotOperationScreen() {
           <Pressable
             onPress={handleCapturePhoto}
             disabled={capturing}
-            style={styles.smallBtn}
+            style={[styles.smallBtn, { borderColor: palette.border }]}
           >
-            <Text style={styles.btnText}>{capturing ? '拍照中' : '拍照'}</Text>
+            <Text style={[styles.btnText, { color: palette.text }]}>
+              {capturing ? '拍照中' : '拍照'}
+            </Text>
           </Pressable>
 
           <Pressable
             onPress={() =>
               navigation.navigate('机器人设置', { robotUuid, robotName })
             }
-            style={styles.smallBtn}
+            style={[styles.smallBtn, { borderColor: palette.border }]}
           >
-            <Text style={styles.btnText}>设置</Text>
+            <Text style={[styles.btnText, { color: palette.text }]}>设置</Text>
           </Pressable>
 
           <Pressable
             onPress={() => sendControl('急停')}
-            style={styles.emergencyBtn}
+            style={[
+              styles.emergencyBtn,
+              {
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '22',
+              },
+            ]}
           >
-            <Text style={styles.emergencyText}>急停</Text>
+            <Text style={[styles.emergencyText, { color: palette.danger }]}>
+              急停
+            </Text>
           </Pressable>
         </View>
 
         <View style={styles.rightInfo}>
-          <Text style={styles.infoText}>{headerText}</Text>
-          <Text style={styles.infoText}>{timeText}</Text>
+          <Text style={[styles.infoText, { color: palette.text }]}>
+            {headerText}
+          </Text>
+          <Text style={[styles.infoText, { color: palette.text }]}>
+            {timeText}
+          </Text>
           <View style={styles.batteryStack}>
             {/* 机器狗在线状态 */}
             <View style={styles.batteryInfo}>
               {dogTelemetry.online ? (
-                <Wifi size={14} color="#44D187" />
+                <Wifi size={14} color={palette.success} />
               ) : (
-                <WifiOff size={14} color="#90A5C3" />
+                <WifiOff size={14} color={palette.textMuted} />
               )}
               <Text style={[styles.infoText, { color: dogOnlineColor }]}>
                 {dogTelemetry.online ? '在线' : '离线'}
@@ -276,8 +295,8 @@ export function RobotOperationScreen() {
             </View>
             {/* 机器狗体温 */}
             <View style={styles.batteryInfo}>
-              <Thermometer size={14} color="#DCE7FF" />
-              <Text style={styles.infoText}>
+              <Thermometer size={14} color={palette.text} />
+              <Text style={[styles.infoText, { color: palette.text }]}>
                 {dogTelemetry.temp !== null
                   ? `${dogTelemetry.temp.toFixed(1)}°C`
                   : '--'}
@@ -287,14 +306,14 @@ export function RobotOperationScreen() {
           <View style={styles.batteryStack}>
             {/* 手机电量 */}
             <View style={styles.batteryInfo}>
-              <Smartphone size={14} color="#DCE7FF" />
-              <Text style={styles.infoText}>
+              <Smartphone size={14} color={palette.text} />
+              <Text style={[styles.infoText, { color: palette.text }]}>
                 {phoneBattery !== null ? `${phoneBattery}%` : '--'}
               </Text>
             </View>
             {/* 机器狗电量 */}
             <View style={styles.batteryInfo}>
-              <Bot size={14} color="#DCE7FF" />
+              <Bot size={14} color={palette.text} />
               <Text style={[styles.infoText, { color: dogPowerColor }]}>
                 {dogTelemetry.power !== null ? `${dogTelemetry.power}%` : '--'}
               </Text>
@@ -304,20 +323,33 @@ export function RobotOperationScreen() {
       </View>
 
       {/* ── 视频区域（直连机器狗 RTSP 流）─────────────────────────────────── */}
-      <View style={styles.videoArea}>
+      <View style={[styles.videoArea, { backgroundColor: '#000000' }]}>
         {showVideo ? (
           robotIp ? (
             <RtspVideoPlayer robotIp={robotIp} />
           ) : (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>
+            <View
+              style={[
+                styles.placeholder,
+                { backgroundColor: palette.surfaceAlt },
+              ]}
+            >
+              <Text
+                style={[styles.placeholderText, { color: palette.textMuted }]}
+              >
                 未配置机器人 IP，无法获取视频流
               </Text>
             </View>
           )
         ) : (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>视频已关闭</Text>
+          <View
+            style={[styles.placeholder, { backgroundColor: palette.surfaceAlt }]}
+          >
+            <Text
+              style={[styles.placeholderText, { color: palette.textMuted }]}
+            >
+              视频已关闭
+            </Text>
           </View>
         )}
 
@@ -326,22 +358,44 @@ export function RobotOperationScreen() {
           {/* 右上角圆形按钮 */}
           <Pressable
             onPress={() => setChatVisible(true)}
-            style={[styles.circleBtn, styles.chatPos]}
+            style={[
+              styles.circleBtn,
+              styles.chatPos,
+              {
+                backgroundColor: palette.surface + 'E6',
+                borderColor: palette.border,
+                right: 20 + insets.right,
+              },
+            ]}
           >
-            <Text style={styles.btnText}>对话</Text>
+            <Text style={[styles.btnText, { color: palette.text }]}>对话</Text>
           </Pressable>
 
           <Pressable
             onPress={() => setMicEnabled(v => !v)}
-            style={[styles.circleBtn, styles.micPos]}
+            style={[
+              styles.circleBtn,
+              styles.micPos,
+              {
+                backgroundColor: palette.surface + 'E6',
+                borderColor: palette.border,
+                right: 20 + insets.right,
+              },
+            ]}
           >
-            <Text style={styles.btnText}>
+            <Text style={[styles.btnText, { color: palette.text }]}>
               {micEnabled ? '麦克风' : '已静音'}
             </Text>
           </Pressable>
 
           {/* 左摇杆 */}
-          <View style={styles.leftJoystick} pointerEvents="box-none">
+          <View
+            style={[
+              styles.leftJoystick,
+              { left: 16 + insets.left, bottom: 20 + insets.bottom },
+            ]}
+            pointerEvents="box-none"
+          >
             <JoystickPad
               onMove={({ x, y }) => {
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
@@ -350,7 +404,13 @@ export function RobotOperationScreen() {
           </View>
 
           {/* 右摇杆 */}
-          <View style={styles.rightJoystick} pointerEvents="box-none">
+          <View
+            style={[
+              styles.rightJoystick,
+              { right: 100 + insets.right, bottom: 20 + insets.bottom },
+            ]}
+            pointerEvents="box-none"
+          >
             <JoystickPad
               onMove={({ x, y }) => {
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
@@ -365,10 +425,17 @@ export function RobotOperationScreen() {
               onPress={() => sendControl(item.label)}
               style={[
                 styles.actionBtn,
-                { left: `${item.x}%` as any, top: `${item.y}%` as any },
+                {
+                  left: `${item.x}%` as any,
+                  top: `${item.y}%` as any,
+                  backgroundColor: palette.surface + '80',
+                  borderColor: palette.border,
+                },
               ]}
             >
-              <Text style={styles.actionBtnText}>{item.label}</Text>
+              <Text style={[styles.actionBtnText, { color: palette.text }]}>
+                {item.label}
+              </Text>
             </Pressable>
           ))}
 
@@ -380,11 +447,11 @@ export function RobotOperationScreen() {
         <ChatDrawer
           visible={chatVisible}
           onClose={() => setChatVisible(false)}
-          messages={chatMessages}
-          onSend={handleChatSend}
+          robotUuid={robotUuid}
+          robotName={robotName}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -494,7 +561,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   floatingLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 
   // ── 圆形悬浮按钮

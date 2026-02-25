@@ -1,34 +1,33 @@
 import { Maximize2, Minimize2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-
-export type ChatMessage = {
-  id: string;
-  role: 'user' | 'robot';
-  text: string;
-};
+import { usePalette } from '../../../app/theme/palette';
+import { RobotChatPanel } from './RobotChatPanel';
 
 type ChatDrawerProps = {
   visible: boolean;
   onClose: () => void;
-  messages: ChatMessage[];
-  onSend: (text: string) => void;
+  robotUuid?: string;
+  robotName?: string;
 };
 
 /**
- * 聊天抽屉 —— 从右侧滑入，仿 el-drawer direction="rtl"
+ * 聊天抽屉 —— 从右侧滑入，内嵌 RobotChatPanel（完整 WebSocket 聊天）
  */
-export function ChatDrawer({ visible, onClose, messages, onSend }: ChatDrawerProps) {
+export function ChatDrawer({
+  visible,
+  onClose,
+  robotUuid,
+  robotName,
+}: ChatDrawerProps) {
+  const palette = usePalette();
   const [chatFullscreen, setChatFullscreen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
   const chatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -38,8 +37,8 @@ export function ChatDrawer({ visible, onClose, messages, onSend }: ChatDrawerPro
       useNativeDriver: true,
     }).start();
     if (!visible) setChatFullscreen(false);
-  // chatAnim is a stable Animated.Value ref — no need to re-run when it changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // chatAnim is a stable Animated.Value ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const chatTranslateX = chatAnim.interpolate({
@@ -47,73 +46,59 @@ export function ChatDrawer({ visible, onClose, messages, onSend }: ChatDrawerPro
     outputRange: [400, 0],
   });
 
-  function handleSend() {
-    const text = chatInput.trim();
-    if (!text) return;
-    onSend(text);
-    setChatInput('');
-  }
-
   if (!visible) return null;
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable style={styles.chatOverlay} onPress={onClose} />
       <Animated.View
         style={[
           styles.chatDrawer,
           chatFullscreen ? styles.chatDrawerFull : styles.chatDrawerHalf,
-          { transform: [{ translateX: chatTranslateX }] },
+          {
+            transform: [{ translateX: chatTranslateX }],
+            backgroundColor: palette.background,
+            borderLeftColor: palette.border,
+          },
         ]}
       >
-        <View style={styles.chatHeader}>
-          <Text style={styles.chatTitle}>机器人对话</Text>
-          <View style={styles.chatHeaderActions}>
-            <Pressable
-              onPress={() => setChatFullscreen(v => !v)}
-              style={[styles.smallBtn, styles.smallBtnMr]}
-            >
-              {chatFullscreen
-                ? <Minimize2 size={14} color="#DCE7FF" />
-                : <Maximize2 size={14} color="#DCE7FF" />}
-            </Pressable>
-            <Pressable onPress={onClose} style={styles.smallBtn}>
-              <Text style={styles.btnText}>×</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <FlatList
-          data={messages}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.chatList}
-          style={styles.chatFlatList}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.chatBubble,
-                item.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleRobot,
-              ]}
-            >
-              <Text style={styles.chatBubbleText}>{item.text}</Text>
-            </View>
-          )}
-        />
-
-        <View style={styles.chatFooter}>
-          <TextInput
-            value={chatInput}
-            onChangeText={setChatInput}
-            placeholder="输入消息..."
-            placeholderTextColor="#8FA2C7"
-            style={styles.chatInput}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-          />
-          <Pressable style={styles.chatSendBtn} onPress={handleSend}>
-            <Text style={styles.btnText}>发送</Text>
+        {/* ── 抽屉头部 ──────────────────────────────────────────────────── */}
+        <View style={styles.floatingActions}>
+          <Pressable
+            onPress={() => setChatFullscreen(v => !v)}
+            style={[
+              styles.smallBtn,
+              styles.smallBtnMr,
+              { borderColor: palette.border, backgroundColor: palette.background },
+            ]}
+          >
+            {chatFullscreen ? (
+              <Minimize2 size={14} color={palette.text} />
+            ) : (
+              <Maximize2 size={14} color={palette.text} />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={onClose}
+            style={[
+              styles.smallBtn,
+              { borderColor: palette.border, backgroundColor: palette.background },
+            ]}
+          >
+            <Text style={[styles.btnText, { color: palette.text }]}>×</Text>
           </Pressable>
         </View>
+
+        {/* ── 聊天面板 ──────────────────────────────────────────────────── */}
+        {robotUuid ? (
+          <RobotChatPanel robotUuid={robotUuid} robotName={robotName} />
+        ) : (
+          <View style={styles.noRobot}>
+            <Text style={[styles.noRobotText, { color: palette.textMuted }]}>
+              未指定机器人
+            </Text>
+          </View>
+        )}
       </Animated.View>
     </View>
   );
@@ -121,7 +106,7 @@ export function ChatDrawer({ visible, onClose, messages, onSend }: ChatDrawerPro
 
 const styles = StyleSheet.create({
   chatOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   chatDrawer: {
@@ -140,6 +125,14 @@ const styles = StyleSheet.create({
   },
   chatDrawerFull: {
     width: '100%',
+  },
+  floatingActions: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   chatHeader: {
     height: 50,
@@ -162,59 +155,6 @@ const styles = StyleSheet.create({
   smallBtnMr: {
     marginRight: 6,
   },
-  chatFlatList: {
-    flex: 1,
-  },
-  chatList: {
-    padding: 10,
-    gap: 8,
-  },
-  chatBubble: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    maxWidth: '88%',
-  },
-  chatBubbleUser: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#3A6FE6',
-  },
-  chatBubbleRobot: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1B273D',
-    borderWidth: 1,
-    borderColor: '#41506F',
-  },
-  chatBubbleText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-  },
-  chatFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#2C374D',
-    padding: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  chatInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#41506F',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    color: '#DCE7FF',
-    fontSize: 14,
-  },
-  chatSendBtn: {
-    borderWidth: 1,
-    borderColor: '#41506F',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: '#22314A',
-  },
   smallBtn: {
     borderWidth: 1,
     borderColor: '#41506F',
@@ -226,5 +166,14 @@ const styles = StyleSheet.create({
     color: '#DCE7FF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  noRobot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noRobotText: {
+    color: '#8FA2C7',
+    fontSize: 14,
   },
 });

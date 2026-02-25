@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { usePalette } from '../../../app/theme/palette';
 
 export type DanmakuItem = {
   id: string;
@@ -15,7 +16,12 @@ type DanmakuMessageProps = {
 };
 
 /** 单条弹幕消息：从左侧滑入，停留后向上淡出 */
-function DanmakuMessage({ text, onExpire, duration = 2500 }: DanmakuMessageProps) {
+function DanmakuMessage({
+  text,
+  onExpire,
+  duration = 2500,
+}: DanmakuMessageProps) {
+  const palette = usePalette();
   const translateX = useRef(new Animated.Value(-240)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -58,10 +64,15 @@ function DanmakuMessage({ text, onExpire, duration = 2500 }: DanmakuMessageProps
     <Animated.View
       style={[
         styles.bubble,
-        { transform: [{ translateX }, { translateY }], opacity },
+        {
+          transform: [{ translateX }, { translateY }],
+          opacity,
+          backgroundColor: palette.surface + 'D9', // 85% opacity
+          borderColor: palette.border,
+        },
       ]}
     >
-      <Text style={styles.bubbleText} numberOfLines={2}>{text}</Text>
+      <Text style={[styles.bubbleText, { color: palette.text }]}>{text}</Text>
     </Animated.View>
   );
 }

@@ -1,0 +1,222 @@
+/**
+ * useRobotWebSocket
+ *
+ * 手机端连接后端服务器的 WebSocket Hook。
+ *
+ * 连接方式：
+ *   /api/v1/interaction/connect/business?robotId={robotUUID}&role=ui
+ *   ↑ robotId  = 目标机器狗的 UUID（告诉服务器订阅哪台机器狗的消息）
+ *   ↑ role=ui  = 标识本端是 UI 客户端（机器狗端使用 role=robot）
+ *
+ * 支持的消息类型：
+ *   发送：text_input（→大模型）/ tts_input（→机器狗语音）/ action_input（→动作指令）
+ *   接收：text_response / asr_transcript / error
+ *
+ * 特性：连接超时检测、断线自动重连（指数退避，最多 5 次）
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getActiveEnvironment, getApiBaseUrl } from '../../../shared/config/environment';
+
+// 后端 WebSocket 对话通道路径（与后端 server.ts 中的 basePath + '/business' 一致）
+const WS_CHAT_PATH = '/api/v1/interaction/connect/business';
+const CONNECT_TIMEOUT_MS = 8000;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY_MS = 2000; // 指数退避：2s, 4s, 8s, 16s, 32s
+
+export type WsMessage = {
+  type: string;
+  robotId?: string;
+  timestamp: number;
+  data?: any;
+};
+
+export type MessageHandler = (data: WsMessage) => void;
+
+export type TtsOptions = {
+  voice?: string;
+  speed?: number;
+  pitch?: number;
+  volume?: number;
+};
+
+export type UseRobotWebSocketResult = {
+  isConnected: boolean;
+  connect: (robotId: string) => void;
+  disconnect: () => void;
+  /** 发送文本给大模型，服务器回复后广播 text_response */
+  sendToAI: (text: string, ttsOptions?: TtsOptions) => void;
+  /** 直接合成 TTS 推送到机器狗播放，不经过大模型 */
+  sendToRobot: (text: string, ttsOptions?: TtsOptions) => void;
+  /** 发送动作指令 */
+  sendAction: (action: string, parameters?: Record<string, any>) => void;
+  /** 底层消息发送，用于自定义消息类型 */
+  sendRaw: (msg: WsMessage) => void;
+  /** 注册消息监听，返回取消监听函数 */
+  onMessage: (handler: MessageHandler) => () => void;
+};
+
+/** 将 http/https baseUrl 转为对应的 ws/wss URL */
+function toWsUrl(baseUrl: string, path: string, robotId: string): string {
+  const wsBase = baseUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
+  return `${wsBase}${path}?robotId=${robotId}&role=ui`;
+}
+
+/** 从服务器拉取 UI 配置，获取可能自定义的 WS 地址 */
+async function fetchWsChatUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/config/ui`).then(r => r.json());
+    if (res?.success && res.data?.wsBusinessUrl) {
+      return String(res.data.wsBusinessUrl);
+    }
+  } catch {
+    // 忽略，使用本地环境配置
+  }
+  return null;
+}
+
+export function useRobotWebSocket(): UseRobotWebSocketResult {
+  const wsRef = useRef<WebSocket | null>(null);
+  const robotIdRef = useRef<string>('');
+  const serverBaseRef = useRef<string>('');    // 缓存已解析的服务器地址
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectCountRef = useRef(0);
+  const destroyedRef = useRef(false);           // 组件卸载后禁止重连
+
+  const [isConnected, setIsConnected] = useState(false);
+  const handlersRef = useRef<Set<MessageHandler>>(new Set());
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  };
+
+  /** 注册消息监听，返回取消监听函数 */
+  const onMessage = useCallback((handler: MessageHandler) => {
+    handlersRef.current.add(handler);
+    return () => { handlersRef.current.delete(handler); };
+  }, []);
+
+  const disconnect = useCallback(() => {
+    clearReconnectTimer();
+    if (wsRef.current) {
+      wsRef.current.onclose = null; // 阻止 onclose 触发自动重连
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  }, []);
+
+  /** 内部：建立一次 WebSocket 连接，断线后自动重连 */
+  const openSocket = useCallback((robotId: string, wsUrl: string) => {
+    const timeoutId = setTimeout(() => {
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        wsRef.current?.close();
+      }
+    }, CONNECT_TIMEOUT_MS);
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      clearTimeout(timeoutId);
+      reconnectCountRef.current = 0;
+      setIsConnected(true);
+    };
+
+    ws.onmessage = (event: MessageEvent) => {
+      try {
+        const data: WsMessage = JSON.parse(
+          typeof event.data === 'string' ? event.data : event.data.toString(),
+        );
+        handlersRef.current.forEach(h => h(data));
+      } catch { /* 忽略解析错误 */ }
+    };
+
+    ws.onerror = () => { clearTimeout(timeoutId); };
+
+    ws.onclose = () => {
+      clearTimeout(timeoutId);
+      setIsConnected(false);
+      wsRef.current = null;
+
+      if (!destroyedRef.current && reconnectCountRef.current < MAX_RECONNECT_ATTEMPTS) {
+        const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectCountRef.current);
+        reconnectCountRef.current++;
+        reconnectTimerRef.current = setTimeout(() => {
+          if (!destroyedRef.current) {
+            openSocket(robotId, wsUrl);
+          }
+        }, delay);
+      }
+    };
+  // openSocket 自引用，eslint 忽略
+   
+  }, []);
+
+  /** 连接到指定机器狗（robotId = 机器狗 UUID） */
+  const connect = useCallback(
+    async (robotId: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN && robotIdRef.current === robotId) {
+        return; // 已连接同一台机器狗，跳过
+      }
+      disconnect();
+      destroyedRef.current = false;
+      robotIdRef.current = robotId;
+      reconnectCountRef.current = 0;
+
+      // 解析服务器地址：优先从后端配置接口获取，其次用本地活跃环境
+      if (!serverBaseRef.current) {
+        const remoteBase = await fetchWsChatUrl();
+        serverBaseRef.current = remoteBase || getActiveEnvironment().baseUrl;
+      }
+
+      openSocket(robotId, toWsUrl(serverBaseRef.current, WS_CHAT_PATH, robotId));
+    },
+    [disconnect, openSocket],
+  );
+
+  const sendRaw = useCallback((msg: WsMessage) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+      console.warn('[useRobotWebSocket] WebSocket 未就绪，消息丢弃:', msg.type);
+      return;
+    }
+    wsRef.current.send(JSON.stringify(msg));
+  }, []);
+
+  /** 发送文本给大模型 */
+  const sendToAI = useCallback(
+    (text: string, ttsOptions: TtsOptions = {}) => {
+      sendRaw({ type: 'text_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { text, ttsOptions } });
+    },
+    [sendRaw],
+  );
+
+  /** 直接合成 TTS 推送到机器狗 */
+  const sendToRobot = useCallback(
+    (text: string, ttsOptions: TtsOptions = {}) => {
+      sendRaw({ type: 'tts_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { text, ttsOptions } });
+    },
+    [sendRaw],
+  );
+
+  /** 发送动作指令 */
+  const sendAction = useCallback(
+    (action: string, parameters: Record<string, any> = {}) => {
+      sendRaw({ type: 'action_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { action, parameters } });
+    },
+    [sendRaw],
+  );
+
+  useEffect(() => {
+    destroyedRef.current = false;
+    return () => {
+      destroyedRef.current = true;
+      disconnect();
+    };
+  }, [disconnect]);
+
+  return { isConnected, connect, disconnect, sendToAI, sendToRobot, sendAction, sendRaw, onMessage };
+}

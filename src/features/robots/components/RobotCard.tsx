@@ -8,6 +8,13 @@
  */
 
 import React from 'react';
+import {
+  Battery,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
+  Thermometer,
+} from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Palette } from '../../../app/theme/palette';
 import { useRobotTelemetry } from '../hooks/useRobotTelemetry';
@@ -46,6 +53,18 @@ export function RobotCard({
           ? palette.warning
           : palette.success;
 
+  // ── 根据电量选择电池图标 ────────────────────────────────────────────────────
+  const BatteryIcon =
+    telemetry.power === null
+      ? Battery
+      : telemetry.power <= 20
+        ? BatteryLow
+        : telemetry.power <= 50
+          ? BatteryMedium
+          : telemetry.power < 100
+            ? Battery
+            : BatteryFull;
+
   return (
     <Pressable
       onPress={onOperate}
@@ -71,17 +90,23 @@ export function RobotCard({
 
       {/* ── 遥测行：电量 + 体温 ─────────────────────────────────────────── */}
       <View style={styles.telemetryRow}>
-        <Text style={[styles.telemetryItem, { color: powerColor }]}>
-          🔋 {telemetry.power !== null ? `${telemetry.power}%` : '--'}
-        </Text>
-        <Text style={[styles.telemetryItem, { color: palette.textMuted }]}>
-          🌡 {telemetry.temp !== null ? `${telemetry.temp.toFixed(1)}°C` : '--'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <BatteryIcon size={14} color={powerColor} />
+          <Text style={[styles.telemetryItem, { color: powerColor }]}>
+            {telemetry.power !== null ? `${telemetry.power}%` : '--'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Thermometer size={14} color={palette.textMuted} />
+          <Text style={[styles.telemetryItem, { color: palette.textMuted }]}>
+            {telemetry.temp !== null ? `${telemetry.temp.toFixed(1)}°C` : '--'}
+          </Text>
+        </View>
       </View>
 
       {/* ── 元信息 ──────────────────────────────────────────────────────── */}
       <Text style={[styles.meta, { color: palette.textMuted }]}>
-        IP {item.ip || '-'} | 组 {item.group_name || '-'} | 状态 {item.status}
+        IP {item.ip || '-'} | 组 {item.group_name || '-'}
       </Text>
       <Text style={[styles.meta, { color: palette.textMuted }]}>
         标签 {item.tags.join(', ') || '-'} | 角色 {item.role?.name || '-'}

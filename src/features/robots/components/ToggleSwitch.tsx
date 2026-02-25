@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePalette } from '../../../app/theme/palette';
 
 type ToggleSwitchProps = {
   value: boolean;
@@ -8,14 +9,37 @@ type ToggleSwitchProps = {
   inactiveText: string;
 };
 
-export function ToggleSwitch({ value, onValueChange, activeText, inactiveText }: ToggleSwitchProps) {
+export function ToggleSwitch({
+  value,
+  onValueChange,
+  activeText,
+  inactiveText,
+}: ToggleSwitchProps) {
+  const palette = usePalette();
+
   return (
     <Pressable
       onPress={() => onValueChange(!value)}
-      style={[styles.toggleSwitch, value ? styles.toggleSwitchOn : styles.toggleSwitchOff]}
+      style={[
+        styles.toggleSwitch,
+        { backgroundColor: value ? palette.primary : palette.surfaceAlt },
+        value ? null : { borderWidth: 1, borderColor: palette.border },
+      ]}
     >
-      <View style={[styles.toggleThumb, value ? styles.toggleThumbRight : styles.toggleThumbLeft]} />
-      <Text style={[styles.toggleLabel, value ? styles.toggleLabelLeft : styles.toggleLabelRight]}>
+      <View
+        style={[
+          styles.toggleThumb,
+          value ? styles.toggleThumbRight : styles.toggleThumbLeft,
+          { backgroundColor: palette.surface },
+        ]}
+      />
+      <Text
+        style={[
+          styles.toggleLabel,
+          value ? styles.toggleLabelLeft : styles.toggleLabelRight,
+          { color: value ? '#FFFFFF' : palette.textMuted },
+        ]}
+      >
         {value ? activeText : inactiveText}
       </Text>
     </Pressable>
@@ -31,19 +55,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  toggleSwitchOn: {
-    backgroundColor: '#4D86F7',
-  },
-  toggleSwitchOff: {
-    backgroundColor: '#3D4E71',
-  },
   toggleThumb: {
     position: 'absolute',
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#E6EEFF',
-    top: 3,
+    top: 2, // Adjusted for border
   },
   toggleThumbLeft: {
     left: 3,
@@ -55,7 +72,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   toggleLabelLeft: {
     left: 6,
