@@ -1,3 +1,8 @@
+import {
+  // BrainCircuit,
+  Bot,
+  Send,
+} from 'lucide-react-native';
 import React, {
   useCallback,
   useEffect,
@@ -17,11 +22,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {
-  // BrainCircuit,
-  Bot,
-  Send
-} from 'lucide-react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
 
@@ -82,7 +82,11 @@ function formatTime(ts: number): string {
  * 机器人聊天面板 —— 自包含 WebSocket 连接 + 聊天 UI
  * 可嵌入到 Screen 全屏页面或 ChatDrawer 抽屉中
  */
-export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false }: RobotChatPanelProps) {
+export function RobotChatPanel({
+  robotUuid,
+  robotName,
+  showStatusHeader = false,
+}: RobotChatPanelProps) {
   const palette = usePalette();
 
   const [input, setInput] = useState('');
@@ -120,7 +124,7 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      (e) => {
+      e => {
         setKeyboardOffset(e.endCoordinates.height);
       },
     );
@@ -302,10 +306,10 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
               isRight
                 ? { backgroundColor: palette.primary }
                 : {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                  borderWidth: 1,
-                },
+                    backgroundColor: palette.surface,
+                    borderColor: palette.border,
+                    borderWidth: 1,
+                  },
             ]}
           >
             <View style={styles.bubbleMeta}>
@@ -313,7 +317,9 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
                 style={[
                   styles.metaLabel,
                   {
-                    color: isRight ? 'rgba(255,255,255,0.7)' : palette.textMuted,
+                    color: isRight
+                      ? 'rgba(255,255,255,0.7)'
+                      : palette.textMuted,
                   },
                 ]}
               >
@@ -327,7 +333,9 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
                 style={[
                   styles.metaTime,
                   {
-                    color: isRight ? 'rgba(255,255,255,0.6)' : palette.textMuted,
+                    color: isRight
+                      ? 'rgba(255,255,255,0.6)'
+                      : palette.textMuted,
                   },
                 ]}
               >
@@ -379,7 +387,11 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
           <View
             style={[
               styles.dot,
-              { backgroundColor: isConnected ? palette.success : palette.textMuted },
+              {
+                backgroundColor: isConnected
+                  ? palette.success
+                  : palette.textMuted,
+              },
             ]}
           />
           <Text style={[styles.statusText, { color: palette.textMuted }]}>
@@ -444,7 +456,9 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
             disabled={!isConnected || !input.trim()}
             onPress={() => handleSend('robot')}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
               {/* <Text style={styles.sendBtnText}>发给</Text> */}
               <Bot size={14} color="#FFFFFF" />
             </View>
@@ -460,7 +474,9 @@ export function RobotChatPanel({ robotUuid, robotName, showStatusHeader = false 
             disabled={!isConnected || !input.trim()}
             onPress={() => handleSend('ai')}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
               {/* <Text style={styles.sendBtnText}>发给</Text> */}
               <Send size={14} color="#FFFFFF" />
               {/* <View style={{ transform: [{ rotate: '90deg' }] }}>

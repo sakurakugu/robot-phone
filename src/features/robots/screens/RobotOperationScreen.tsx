@@ -72,7 +72,9 @@ export function RobotOperationScreen() {
   const dogTelemetry = useRobotTelemetry(robotIp, 3000);
 
   // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
-  const dogOnlineColor = dogTelemetry.online ? palette.success : palette.textMuted;
+  const dogOnlineColor = dogTelemetry.online
+    ? palette.success
+    : palette.textMuted;
   const dogPowerColor =
     dogTelemetry.power !== null && dogTelemetry.power <= 20
       ? palette.danger
@@ -343,7 +345,10 @@ export function RobotOperationScreen() {
           )
         ) : (
           <View
-            style={[styles.placeholder, { backgroundColor: palette.surfaceAlt }]}
+            style={[
+              styles.placeholder,
+              { backgroundColor: palette.surfaceAlt },
+            ]}
           >
             <Text
               style={[styles.placeholderText, { color: palette.textMuted }]}

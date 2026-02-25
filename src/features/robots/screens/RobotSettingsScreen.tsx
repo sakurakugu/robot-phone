@@ -1,30 +1,171 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { Volume, Volume1, Volume2, VolumeX } from 'lucide-react-native';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
+import { fetchRobot, updateRobot } from '../api';
 import {
-  fetchRobot,
-  getRobotConfig,
-  getRobotVolume,
-  setRobotMute,
-  setRobotVolume,
-  updateRobot,
-  updateRobotConfig,
-} from '../api';
+  ActionRow,
+  InfoRow,
+  InputRow,
+  Section,
+} from '../components/SettingsComponents';
+import { RobotClient } from '../robotClient';
 import type { Robot, RobotForm } from '../types';
 
 type RouteParams = {
   robotUuid: string;
   robotName?: string;
 };
+
+// ── 音量滑条组件 ──
+type VolumeRowProps = {
+  volume: number;
+  muted: boolean;
+  onVolumeChange: (val: number) => void;
+  onMuteToggle: () => void;
+};
+function VolumeRow({
+  volume,
+  muted,
+  onVolumeChange,
+  onMuteToggle,
+}: VolumeRowProps) {
+  const palette = usePalette();
+  const [displayVolume, setDisplayVolume] = useState(volume);
+  const containerRef = useRef<View>(null);
+  const pageXRef = useRef(0);
+  const widthRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onVolumeChangeRef = useRef(onVolumeChange);
+
+  useEffect(() => {
+    setDisplayVolume(volume);
+  }, [volume]);
+  useEffect(() => {
+    onVolumeChangeRef.current = onVolumeChange;
+  }, [onVolumeChange]);
+
+  const applyPageX = useCallback((pageX: number) => {
+    const x = Math.max(0, pageX - pageXRef.current);
+    const w = widthRef.current;
+    if (!w) return;
+    const val = Math.round(Math.min(100, Math.max(0, (x / w) * 100)));
+    setDisplayVolume(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => onVolumeChangeRef.current(val), 300);
+  }, []);
+
+  const pct = muted ? 0 : displayVolume;
+  const trackColor = muted ? '#aaa' : palette.primary;
+  const VolumeIcon = muted
+    ? VolumeX
+    : displayVolume > 60
+      ? Volume2
+      : displayVolume > 20
+        ? Volume1
+        : Volume;
+
+  return (
+    <View style={volStyles.row}>
+      <Pressable onPress={onMuteToggle} style={volStyles.iconBtn} hitSlop={8}>
+        <VolumeIcon size={24} color={trackColor} />
+      </Pressable>
+      <View
+        ref={containerRef}
+        style={volStyles.sliderArea}
+        onLayout={() => {
+          containerRef.current?.measure((_x, _y, w, _h, px) => {
+            pageXRef.current = px;
+            widthRef.current = w;
+          });
+        }}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={e => applyPageX(e.nativeEvent.pageX)}
+        onResponderMove={e => applyPageX(e.nativeEvent.pageX)}
+      >
+        {/* 轨道背景 */}
+        <View
+          style={[volStyles.track, { backgroundColor: palette.surfaceAlt }]}
+        >
+          {/* 填充 */}
+          <View
+            style={[
+              volStyles.fill,
+              { width: `${pct}%`, backgroundColor: trackColor },
+            ]}
+          />
+        </View>
+        {/* 拖柄 */}
+        <View
+          style={[
+            volStyles.thumb,
+            { left: `${pct}%`, backgroundColor: trackColor },
+          ]}
+        />
+      </View>
+      <Text style={[volStyles.label, { color: palette.textMuted }]}>
+        {muted ? '静音' : `${displayVolume}%`}
+      </Text>
+    </View>
+  );
+}
+const volStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  iconBtn: { padding: 4 },
+  sliderArea: {
+    flex: 1,
+    height: 40,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 17,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  thumb: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    top: 10,
+    marginLeft: -10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    width: 36,
+    textAlign: 'right',
+  },
+});
 
 function splitTags(input: string): string[] {
   return input
@@ -33,23 +174,34 @@ function splitTags(input: string): string[] {
     .filter(Boolean);
 }
 
+// --- Main Screen ---
+
 export function RobotSettingsScreen() {
   const palette = usePalette();
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { robotUuid, robotName } = (route.params || {}) as RouteParams;
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [robot, setRobot] = useState<Robot | null>(null);
+
+  // Client State
+  const [client, setClient] = useState<RobotClient | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  // Basic Info State
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
   const [ip, setIp] = useState('');
   const [groupName, setGroupName] = useState('');
   const [sn, setSn] = useState('');
   const [tagsText, setTagsText] = useState('');
+
+  // Volume State
   const [volume, setVolume] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [configText, setConfigText] = useState('');
 
   const withLoading = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -62,6 +214,35 @@ export function RobotSettingsScreen() {
       setLoading(false);
     }
   }, []);
+
+  // Initialize Client when IP changes
+  useEffect(() => {
+    if (ip && !isConnected && !connecting) {
+      const initClient = async () => {
+        setConnecting(true);
+        try {
+          const c = new RobotClient(ip);
+          await c.login();
+          setClient(c);
+          setIsConnected(true);
+          setMessage('已连接到机器人');
+
+          // Initial load
+          const volData = await c.getVolume();
+          if (volData.success) {
+            setVolume(volData.data.volume);
+            setMuted(volData.data.muted);
+          }
+        } catch (e: any) {
+          console.log('Connect failed:', e);
+          // Don't show error immediately to avoid annoyance, just leave isConnected false
+        } finally {
+          setConnecting(false);
+        }
+      };
+      initClient();
+    }
+  }, [ip, isConnected, connecting]);
 
   const loadRobot = useCallback(async () => {
     await withLoading(async () => {
@@ -85,8 +266,6 @@ export function RobotSettingsScreen() {
     [robot?.name, robotName, robotUuid],
   );
 
-  const inputStyle = [styles.input, { borderColor: palette.border, color: palette.text }];
-
   async function handleSaveBasic() {
     const payload: RobotForm = {
       name: name || undefined,
@@ -103,194 +282,160 @@ export function RobotSettingsScreen() {
     });
   }
 
-  function renderButton(text: string, onPress: () => void, danger = false) {
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={loading}
-        style={[
-          styles.btn,
-          {
-            borderColor: danger ? palette.danger : palette.border,
-            backgroundColor: danger ? palette.surfaceAlt : palette.surface,
-          },
-        ]}
-      >
-        <Text style={{ color: danger ? palette.danger : palette.text }}>{text}</Text>
-      </Pressable>
-    );
-  }
+  // --- Robot Operations ---
+
+  const handleSetVolume = async (val: number) => {
+    if (!client) return;
+    try {
+      await client.setVolume(val);
+      setVolume(val);
+    } catch (e: any) {
+      setMessage(e.message || '设置音量失败');
+    }
+  };
+
+  const handleMuteToggle = async () => {
+    if (!client) return;
+    await withLoading(async () => {
+      const next = !muted;
+      await client.setMute(next);
+      setMuted(next);
+    });
+  };
 
   return (
-    <Screen
-      palette={palette}
-      title="机器人设置"
-      subtitle={subtitle}
-    >
-      <ScrollView contentContainerStyle={styles.container}>
-        {message ? <Text style={[styles.message, { color: palette.warning }]}>{message}</Text> : null}
+    <Screen palette={palette} title="机器人设置" subtitle={subtitle}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {message ? (
+          <Text style={[styles.message, { color: palette.warning }]}>
+            {message}
+          </Text>
+        ) : null}
 
-        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>基本信息</Text>
-          <TextInput
-            style={inputStyle}
-            placeholder="名称"
-            placeholderTextColor={palette.textMuted}
+        <Section title="基本信息">
+          <InputRow
+            label="名称"
             value={name}
             onChangeText={setName}
+            placeholder="未设置"
           />
-          <TextInput
-            style={inputStyle}
-            placeholder="型号"
-            placeholderTextColor={palette.textMuted}
+          <InputRow
+            label="型号"
             value={model}
             onChangeText={setModel}
+            placeholder="未设置"
           />
-          <TextInput
-            style={inputStyle}
-            placeholder="IP"
-            placeholderTextColor={palette.textMuted}
+          <InputRow
+            label="IP"
             value={ip}
             onChangeText={setIp}
+            placeholder="未设置"
             autoCapitalize="none"
           />
-          <TextInput
-            style={inputStyle}
-            placeholder="分组"
-            placeholderTextColor={palette.textMuted}
+          <InputRow
+            label="分组"
             value={groupName}
             onChangeText={setGroupName}
+            placeholder="未设置"
           />
-          <TextInput
-            style={inputStyle}
-            placeholder="SN"
-            placeholderTextColor={palette.textMuted}
+          <InputRow
+            label="SN"
             value={sn}
             onChangeText={setSn}
+            placeholder="未设置"
           />
-          <TextInput
-            style={inputStyle}
-            placeholder="标签（逗号分隔）"
-            placeholderTextColor={palette.textMuted}
+          <InputRow
+            label="标签"
             value={tagsText}
             onChangeText={setTagsText}
+            placeholder="逗号分隔"
           />
-          {renderButton('保存基本信息', handleSaveBasic)}
-        </View>
-
-        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>音量控制</Text>
-          <Text style={[styles.meta, { color: palette.textMuted }]}>当前音量: {volume} | 静音: {muted ? '是' : '否'}</Text>
-          <View style={styles.row}>
-            {renderButton('获取音量', () =>
-              withLoading(async () => {
-                const data = await getRobotVolume(robotUuid);
-                setVolume(data.volume);
-                setMuted(data.muted);
-              }),
-            )}
-            {renderButton('音量 +10', () =>
-              withLoading(async () => {
-                const next = Math.min(100, volume + 10);
-                await setRobotVolume(robotUuid, next);
-                setVolume(next);
-              }),
-            )}
-            {renderButton('音量 -10', () =>
-              withLoading(async () => {
-                const next = Math.max(0, volume - 10);
-                await setRobotVolume(robotUuid, next);
-                setVolume(next);
-              }),
-            )}
-            {renderButton(muted ? '取消静音' : '设置静音', () =>
-              withLoading(async () => {
-                const next = !muted;
-                await setRobotMute(robotUuid, next);
-                setMuted(next);
-              }),
-            )}
-          </View>
-        </View>
-
-        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>配置管理</Text>
-          <View style={styles.row}>
-            {renderButton('读取配置', () =>
-              withLoading(async () => {
-                const data = await getRobotConfig(robotUuid);
-                setConfigText(JSON.stringify(data, null, 2));
-              }),
-            )}
-            {renderButton('保存配置', () =>
-              withLoading(async () => {
-                const payload = configText ? JSON.parse(configText) : {};
-                const updated = await updateRobotConfig(robotUuid, payload);
-                setConfigText(JSON.stringify(updated || payload, null, 2));
-              }),
-            )}
-          </View>
-          <TextInput
-            style={[styles.configInput, { borderColor: palette.border, color: palette.text }]}
-            placeholder="配置 JSON"
-            placeholderTextColor={palette.textMuted}
-            multiline
-            value={configText}
-            onChangeText={setConfigText}
+          <ActionRow
+            label="保存基本信息"
+            onPress={handleSaveBasic}
+            loading={loading}
+            isLast
           />
-        </View>
+        </Section>
+
+        {isConnected ? (
+          <>
+            <Section title="音量控制">
+              <VolumeRow
+                volume={volume}
+                muted={muted}
+                onVolumeChange={handleSetVolume}
+                onMuteToggle={handleMuteToggle}
+              />
+            </Section>
+
+            <Section title="高级功能">
+              <ActionRow
+                label="WiFi 设置"
+                subtitle="管理 WiFi 连接"
+                onPress={() =>
+                  navigation.navigate('WiFi设置', {
+                    robotUuid,
+                    robotName,
+                    robotIp: ip,
+                  })
+                }
+              />
+              <ActionRow
+                label="日志管理"
+                subtitle="查看和下载日志"
+                onPress={() =>
+                  navigation.navigate('日志管理', {
+                    robotUuid,
+                    robotName,
+                    robotIp: ip,
+                  })
+                }
+              />
+              <ActionRow
+                label="高级配置"
+                subtitle="配置参数、SDK 与 运控服务"
+                onPress={() =>
+                  navigation.navigate('高级配置', {
+                    robotUuid,
+                    robotName,
+                    robotIp: ip,
+                  })
+                }
+                isLast
+              />
+            </Section>
+          </>
+        ) : (
+          <Section title="机器人连接">
+            <InfoRow
+              label="状态"
+              value={connecting ? '连接中...' : '未连接 (请检查IP)'}
+              isLast
+            />
+            {!connecting && ip && (
+              <ActionRow
+                label="重试连接"
+                onPress={() => setIp(ip)} // Trigger useEffect
+                isLast
+              />
+            )}
+          </Section>
+        )}
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
+    paddingVertical: 16,
+    paddingBottom: 40,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 10,
   },
   message: {
     fontSize: 12,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  meta: {
-    fontSize: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  btn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-  },
-  configInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    minHeight: 180,
-    padding: 10,
-    textAlignVertical: 'top',
-    fontSize: 12,
-    fontFamily: 'monospace',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });

@@ -54,16 +54,15 @@ export function RobotCard({
           : palette.success;
 
   // ── 根据电量选择电池图标 ────────────────────────────────────────────────────
-  const BatteryIcon =
-    telemetry.power === null
-      ? Battery
-      : telemetry.power <= 20
-        ? BatteryLow
-        : telemetry.power <= 50
-          ? BatteryMedium
-          : telemetry.power < 100
-            ? Battery
-            : BatteryFull;
+function getBatteryIcon(power: number | null) {
+  if (power === null) return Battery;
+  if (power <= 20) return Battery;
+  if (power <= 50) return BatteryLow;
+  if (power <= 80) return BatteryMedium;
+  return BatteryFull;
+}
+
+const BatteryIcon = getBatteryIcon(telemetry.power);
 
   return (
     <Pressable

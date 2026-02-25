@@ -38,7 +38,7 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
 export function useAppPreferences() {
   const context = useContext(AppPreferencesContext);
   if (!context) {
-    throw new Error('useAppPreferences must be used inside AppPreferencesProvider');
+    throw new Error('“useAppPreferences”必须在“AppPreferencesProvider”内部使用。');
   }
   return context;
 }

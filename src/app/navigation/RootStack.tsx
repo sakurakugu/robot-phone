@@ -3,6 +3,9 @@ import React from 'react';
 import { RobotChatScreen } from '../../features/robots/screens/RobotChatScreen';
 import { RobotOperationScreen } from '../../features/robots/screens/RobotOperationScreen';
 import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
+import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
+import { RobotLogScreen } from '../../features/robots/screens/RobotLogScreen';
+import { RobotConfigScreen } from '../../features/robots/screens/RobotConfigScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
 import { NetworkEnvironmentScreen } from '../../features/settings/screens/NetworkEnvironmentScreen';
@@ -37,6 +40,9 @@ export function RootStack() {
         options={{ headerShown: false, orientation: 'landscape' }}
       />
       <Stack.Screen name="机器人设置" component={RobotSettingsScreen} />
+      <Stack.Screen name="WiFi设置" component={RobotWifiScreen} />
+      <Stack.Screen name="日志管理" component={RobotLogScreen} />
+      <Stack.Screen name="高级配置" component={RobotConfigScreen} />
       <Stack.Screen name="机器人对话" component={RobotChatScreen} />
       <Stack.Screen name="设置" component={SettingsScreen} />
       <Stack.Screen name="外观设置" component={AppearanceScreen} />
