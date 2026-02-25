@@ -17,6 +17,7 @@ import {
   fetchRobotGroups,
   fetchRobots,
 } from '../api';
+import { RobotCard } from '../components/RobotCard';
 import { RobotFormModal } from '../components/RobotFormModal';
 import type { Robot, RobotForm } from '../types';
 
@@ -105,78 +106,30 @@ export function RobotManagementScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={loadData} />
         }
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() =>
+          <RobotCard
+            item={item}
+            palette={palette}
+            onOperate={() =>
               navigation.navigate('机器人操作', {
                 robotUuid: item.uuid,
                 robotName: item.name || '',
                 robotIp: item.ip || '',
               })
             }
-            style={[
-              styles.card,
-              { backgroundColor: palette.surface, borderColor: palette.border },
-            ]}
-          >
-            <Text style={[styles.name, { color: palette.text }]}>
-              {item.name || item.uuid}
-            </Text>
-            <Text style={[styles.meta, { color: palette.textMuted }]}>
-              状态 {item.status} | IP {item.ip || '-'} | 组{' '}
-              {item.group_name || '-'}
-            </Text>
-            <Text style={[styles.meta, { color: palette.textMuted }]}>
-              标签 {item.tags.join(', ') || '-'} | 角色 {item.role?.name || '-'}
-            </Text>
-            <View style={styles.row}>
-              <Pressable
-                onPress={e => {
-                  e.stopPropagation();
-                  navigation.navigate('机器人操作', {
-                    robotUuid: item.uuid,
-                    robotName: item.name || '',
-                    robotIp: item.ip || '',
-                  });
-                }}
-                style={[styles.actionBtn, { borderColor: palette.border }]}
-              >
-                <Text style={{ color: palette.text }}>操控</Text>
-              </Pressable>
-              <Pressable
-                onPress={e => {
-                  e.stopPropagation();
-                  navigation.navigate('机器人对话', {
-                    robotUuid: item.uuid,
-                    robotName: item.name || '',
-                  });
-                }}
-                style={[styles.actionBtn, { borderColor: palette.border }]}
-              >
-                <Text style={{ color: palette.text }}>对话</Text>
-              </Pressable>
-              <Pressable
-                onPress={e => {
-                  e.stopPropagation();
-                  navigation.navigate('机器人设置', {
-                    robotUuid: item.uuid,
-                    robotName: item.name || '',
-                  });
-                }}
-                style={[styles.actionBtn, { borderColor: palette.border }]}
-              >
-                <Text style={{ color: palette.text }}>编辑</Text>
-              </Pressable>
-              <Pressable
-                onPress={e => {
-                  e.stopPropagation();
-                  handleDelete(item.uuid);
-                }}
-                style={[styles.actionBtn, { borderColor: palette.danger }]}
-              >
-                <Text style={{ color: palette.danger }}>删除</Text>
-              </Pressable>
-            </View>
-          </Pressable>
+            onChat={() =>
+              navigation.navigate('机器人对话', {
+                robotUuid: item.uuid,
+                robotName: item.name || '',
+              })
+            }
+            onEdit={() =>
+              navigation.navigate('机器人设置', {
+                robotUuid: item.uuid,
+                robotName: item.name || '',
+              })
+            }
+            onDelete={() => handleDelete(item.uuid)}
+          />
         )}
       />
 
@@ -224,28 +177,5 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 10,
   },
-  card: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  meta: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  row: {
-    marginTop: 10,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
+  // card styles moved to RobotCard component
 });

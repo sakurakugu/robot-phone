@@ -1,7 +1,21 @@
 ﻿import { useNavigation, useRoute } from '@react-navigation/native';
-import { Bot, Smartphone } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Bot,
+  Smartphone,
+  Thermometer,
+  Wifi,
+  WifiOff,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  BackHandler,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { getBatteryLevel } from 'react-native-device-info';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
@@ -14,6 +28,7 @@ import {
   useStatusDanmaku,
 } from '../components/StatusDanmaku';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { useRobotTelemetry } from '../hooks/useRobotTelemetry';
 
 type RouteParams = {
   robotUuid: string;
@@ -46,13 +61,24 @@ export function RobotOperationScreen() {
   const [showVideo, setShowVideo] = useState(true);
   const [speed, setSpeed] = useState(5);
   const [micEnabled, setMicEnabled] = useState(true);
-  const [battery] = useState<number | null>(null);
   const [phoneBattery, setPhoneBattery] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { id: '1', role: 'robot', text: '你好，我已准备好接收指令。' },
   ]);
+
+  // 连接机器狗得到遥测（电量、体温、在线状态）
+  const dogTelemetry = useRobotTelemetry(robotIp, 3000);
+
+  // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
+  const dogOnlineColor = dogTelemetry.online ? '#44D187' : '#90A5C3';
+  const dogPowerColor =
+    dogTelemetry.power !== null && dogTelemetry.power <= 20
+      ? '#FF7676'
+      : dogTelemetry.power !== null && dogTelemetry.power <= 50
+        ? '#FFB566'
+        : '#DCE7FF';
 
   // ── 弹幕状态 ─────────────────────────────────────────────────────────────
   const [danmakuMessages, setDanmakuMessages] = useState<DanmakuItem[]>([]);
@@ -107,6 +133,11 @@ export function RobotOperationScreen() {
   }, [setHomeOrientation]);
 
   useEffect(() => {
+    StatusBar.setHidden(true, 'fade');
+    return () => StatusBar.setHidden(false, 'fade');
+  }, []);
+
+  useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (chatVisible) {
         setChatVisible(false);
@@ -157,12 +188,12 @@ export function RobotOperationScreen() {
   const headerText = robotName || '未命名机器人';
 
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['left', 'right', 'bottom']}>
       {/* ── 顶部工具栏 ────────────────────────────────────────────────────── */}
       <View style={styles.topBar}>
         <View style={styles.leftTools}>
           <Pressable onPress={handleGoBack} style={styles.smallBtn}>
-            <Text style={styles.btnText}>返回</Text>
+            <ArrowLeft size={16} color="#DCE7FF" />
           </Pressable>
 
           <ToggleSwitch
@@ -230,19 +261,45 @@ export function RobotOperationScreen() {
 
         <View style={styles.rightInfo}>
           <Text style={styles.infoText}>{headerText}</Text>
-          <View style={styles.batteryInfo}>
-            <Bot size={14} color="#DCE7FF" />
-            <Text style={styles.infoText}>
-              {battery !== null ? `${battery}%` : '--'}
-            </Text>
-          </View>
-          <View style={styles.batteryInfo}>
-            <Smartphone size={14} color="#DCE7FF" />
-            <Text style={styles.infoText}>
-              {phoneBattery !== null ? `${phoneBattery}%` : '--'}
-            </Text>
-          </View>
           <Text style={styles.infoText}>{timeText}</Text>
+          <View style={styles.batteryStack}>
+            {/* 机器狗在线状态 */}
+            <View style={styles.batteryInfo}>
+              {dogTelemetry.online ? (
+                <Wifi size={14} color="#44D187" />
+              ) : (
+                <WifiOff size={14} color="#90A5C3" />
+              )}
+              <Text style={[styles.infoText, { color: dogOnlineColor }]}>
+                {dogTelemetry.online ? '在线' : '离线'}
+              </Text>
+            </View>
+            {/* 机器狗体温 */}
+            <View style={styles.batteryInfo}>
+              <Thermometer size={14} color="#DCE7FF" />
+              <Text style={styles.infoText}>
+                {dogTelemetry.temp !== null
+                  ? `${dogTelemetry.temp.toFixed(1)}°C`
+                  : '--'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.batteryStack}>
+            {/* 手机电量 */}
+            <View style={styles.batteryInfo}>
+              <Smartphone size={14} color="#DCE7FF" />
+              <Text style={styles.infoText}>
+                {phoneBattery !== null ? `${phoneBattery}%` : '--'}
+              </Text>
+            </View>
+            {/* 机器狗电量 */}
+            <View style={styles.batteryInfo}>
+              <Bot size={14} color="#DCE7FF" />
+              <Text style={[styles.infoText, { color: dogPowerColor }]}>
+                {dogTelemetry.power !== null ? `${dogTelemetry.power}%` : '--'}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -288,9 +345,7 @@ export function RobotOperationScreen() {
             <JoystickPad
               onMove={({ x, y }) => {
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
-                sendControl(`移动 x:${x.toFixed(2)} y:${y.toFixed(2)}`);
               }}
-              onEnd={() => sendControl('移动停止')}
             />
           </View>
 
@@ -299,10 +354,7 @@ export function RobotOperationScreen() {
             <JoystickPad
               onMove={({ x, y }) => {
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
-                const ch = controlMode === 'pose' ? '姿态' : '观察';
-                sendControl(`${ch} x:${x.toFixed(2)} y:${y.toFixed(2)}`);
               }}
-              onEnd={() => sendControl('归中')}
             />
           </View>
 
@@ -344,13 +396,13 @@ const styles = StyleSheet.create({
 
   // ── 顶部工具栏
   topBar: {
-    minHeight: 58,
+    minHeight: 48,
     borderBottomWidth: 1,
     borderBottomColor: '#2C374D',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 10,
   },
   leftTools: {
@@ -371,6 +423,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  batteryStack: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 2,
+  },
   infoText: {
     color: '#DCE7FF',
     fontSize: 12,
@@ -380,7 +437,10 @@ const styles = StyleSheet.create({
     borderColor: '#41506F',
     borderRadius: 7,
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 4,
+    minWidth: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emergencyBtn: {
     borderWidth: 1,
