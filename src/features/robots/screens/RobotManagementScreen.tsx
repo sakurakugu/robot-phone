@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -11,7 +11,12 @@ import {
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { createRobot, deleteRobot, fetchRobotGroups, fetchRobots } from '../api';
+import {
+  createRobot,
+  deleteRobot,
+  fetchRobotGroups,
+  fetchRobots,
+} from '../api';
 import { RobotFormModal } from '../components/RobotFormModal';
 import type { Robot, RobotForm } from '../types';
 
@@ -29,7 +34,10 @@ export function RobotManagementScreen() {
     try {
       setRefreshing(true);
       setError('');
-      const [robotList, groupList] = await Promise.all([fetchRobots(), fetchRobotGroups()]);
+      const [robotList, groupList] = await Promise.all([
+        fetchRobots(),
+        fetchRobotGroups(),
+      ]);
       setRobots(robotList);
       setGroups(groupList);
     } catch (e: any) {
@@ -64,7 +72,11 @@ export function RobotManagementScreen() {
             styles.rotateBtn,
             { borderColor: palette.border, backgroundColor: palette.surface },
           ]}
-          onPress={() => setHomeOrientation(v => (v === 'portrait' ? 'landscape' : 'portrait'))}
+          onPress={() =>
+            setHomeOrientation(v =>
+              v === 'portrait' ? 'landscape' : 'portrait',
+            )
+          }
         >
           <Text style={[styles.rotateBtnText, { color: palette.text }]}>
             {homeOrientation === 'portrait' ? '切横屏' : '切竖屏'}
@@ -98,6 +110,7 @@ export function RobotManagementScreen() {
               navigation.navigate('机器人操作', {
                 robotUuid: item.uuid,
                 robotName: item.name || '',
+                robotIp: item.ip || '',
               })
             }
             style={[
@@ -109,7 +122,8 @@ export function RobotManagementScreen() {
               {item.name || item.uuid}
             </Text>
             <Text style={[styles.meta, { color: palette.textMuted }]}>
-              状态 {item.status} | IP {item.ip || '-'} | 组 {item.group_name || '-'}
+              状态 {item.status} | IP {item.ip || '-'} | 组{' '}
+              {item.group_name || '-'}
             </Text>
             <Text style={[styles.meta, { color: palette.textMuted }]}>
               标签 {item.tags.join(', ') || '-'} | 角色 {item.role?.name || '-'}
@@ -121,6 +135,7 @@ export function RobotManagementScreen() {
                   navigation.navigate('机器人操作', {
                     robotUuid: item.uuid,
                     robotName: item.name || '',
+                    robotIp: item.ip || '',
                   });
                 }}
                 style={[styles.actionBtn, { borderColor: palette.border }]}

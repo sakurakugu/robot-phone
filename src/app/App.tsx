@@ -1,19 +1,27 @@
 import {
+  NavigationContainer,
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationDefaultTheme,
-  NavigationContainer,
 } from '@react-navigation/native';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initEnvironments } from '../shared/config/environment';
 import { RootStack } from './navigation/RootStack';
-import { AppPreferencesProvider, useAppPreferences } from './preferences/AppPreferences';
+import {
+  AppPreferencesProvider,
+  useAppPreferences,
+} from './preferences/AppPreferences';
 import { usePalette } from './theme/palette';
 
 function AppContent() {
   const { activeThemeMode } = useAppPreferences();
   const isDarkMode = activeThemeMode === 'dark';
   const palette = usePalette();
+
+  useEffect(() => {
+    initEnvironments();
+  }, []);
 
   const navigationTheme = isDarkMode
     ? {

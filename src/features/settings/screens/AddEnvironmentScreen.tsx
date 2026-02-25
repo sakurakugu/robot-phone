@@ -2,7 +2,10 @@ import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
-import { addEnvironment, setActiveEnvironment } from '../../../shared/config/environment';
+import {
+  addEnvironment,
+  setActiveEnvironment,
+} from '../../../shared/config/environment';
 import { Screen } from '../../../shared/ui/Screen';
 
 export function AddEnvironmentScreen() {
@@ -32,25 +35,40 @@ export function AddEnvironmentScreen() {
   }
 
   return (
-    <Screen palette={palette} title="添加配置环境" subtitle="新增并切换 API 环境">
+    <Screen
+      palette={palette}
+      title="添加配置环境"
+      subtitle="新增并切换 API 环境"
+    >
       <View style={styles.container}>
         <TextInput
-          style={[styles.input, { borderColor: palette.border, color: palette.text }]}
+          style={[
+            styles.input,
+            { borderColor: palette.border, color: palette.text },
+          ]}
           placeholder="环境名称，例如：测试环境"
           placeholderTextColor={palette.textMuted}
           value={name}
           onChangeText={setName}
         />
         <TextInput
-          style={[styles.input, { borderColor: palette.border, color: palette.text }]}
+          style={[
+            styles.input,
+            { borderColor: palette.border, color: palette.text },
+          ]}
           placeholder="基础地址，例如：http://192.168.1.8:9000"
           placeholderTextColor={palette.textMuted}
           value={baseUrl}
           onChangeText={setBaseUrl}
           autoCapitalize="none"
         />
-        {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
-        <Pressable style={[styles.saveBtn, { backgroundColor: palette.primary }]} onPress={save}>
+        {error ? (
+          <Text style={[styles.error, { color: palette.danger }]}>{error}</Text>
+        ) : null}
+        <Pressable
+          style={[styles.saveBtn, { backgroundColor: palette.primary }]}
+          onPress={save}
+        >
           <Text style={styles.saveText}>保存并启用</Text>
         </Pressable>
       </View>

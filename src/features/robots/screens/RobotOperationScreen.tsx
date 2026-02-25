@@ -1,38 +1,37 @@
 ﻿import { useNavigation, useRoute } from '@react-navigation/native';
 import { Bot, Smartphone } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  BackHandler,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getBatteryLevel } from 'react-native-device-info';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
-import { capturePhoto } from '../api';
 import { ChatDrawer, ChatMessage } from '../components/ChatDrawer';
 import { JoystickPad } from '../components/JoystickPad';
-import { DanmakuItem, StatusDanmaku, useStatusDanmaku } from '../components/StatusDanmaku';
+import { RtspVideoPlayer } from '../components/RtspVideoPlayer';
+import {
+  DanmakuItem,
+  StatusDanmaku,
+  useStatusDanmaku,
+} from '../components/StatusDanmaku';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 
 type RouteParams = {
   robotUuid: string;
   robotName?: string;
+  /** 机器狗本体 IP，用于直连 RTSP 视频流 */
+  robotIp?: string;
 };
 
 type ControlMode = 'move' | 'pose';
 
 const ACTION_BUTTONS = [
-  { id: 'stand_up',      label: '起立',     x: 34, y: 78 },
-  { id: 'sit_down',      label: '趴下',     x: 44, y: 78 },
-  { id: 'front_jump',    label: '向前跳',   x: 54, y: 78 },
-  { id: 'jump',          label: '向上跳',   x: 64, y: 78 },
-  { id: 'backflip',      label: '后空翻',   x: 36, y: 88 },
+  { id: 'stand_up', label: '起立', x: 34, y: 78 },
+  { id: 'sit_down', label: '趴下', x: 44, y: 78 },
+  { id: 'front_jump', label: '向前跳', x: 54, y: 78 },
+  { id: 'jump', label: '向上跳', x: 64, y: 78 },
+  { id: 'backflip', label: '后空翻', x: 36, y: 88 },
   { id: 'two_leg_stand', label: '双腿站立', x: 50, y: 88 },
-  { id: 'shake_hand',    label: '打招呼',   x: 64, y: 88 },
+  { id: 'shake_hand', label: '打招呼', x: 64, y: 88 },
 ] as const;
 
 // ─── Screen ───────────────────────────────────────────────────────────────
@@ -40,7 +39,7 @@ export function RobotOperationScreen() {
   const navigation = useNavigation<any>();
   const { setHomeOrientation } = useAppPreferences();
   const route = useRoute<any>();
-  const { robotUuid, robotName } = (route.params || {}) as RouteParams;
+  const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
 
   const [controlMode, setControlMode] = useState<ControlMode>('move');
   const [sdkMode, setSdkMode] = useState(true);
@@ -50,7 +49,6 @@ export function RobotOperationScreen() {
   const [battery] = useState<number | null>(null);
   const [phoneBattery, setPhoneBattery] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
-  const [photoUri, setPhotoUri] = useState('');
   const [chatVisible, setChatVisible] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { id: '1', role: 'robot', text: '你好，我已准备好接收指令。' },
@@ -58,23 +56,38 @@ export function RobotOperationScreen() {
 
   // ── 弹幕状态 ─────────────────────────────────────────────────────────────
   const [danmakuMessages, setDanmakuMessages] = useState<DanmakuItem[]>([]);
-  const { push: pushDanmaku, expire: expireDanmaku, setMessagesExternal } = useStatusDanmaku();
+  const {
+    push: pushDanmaku,
+    expire: expireDanmaku,
+    setMessagesExternal,
+  } = useStatusDanmaku();
 
   useEffect(() => {
     setMessagesExternal.current = setDanmakuMessages;
   }, [setMessagesExternal]);
 
-  const sendControl = useCallback((text: string) => {
-    pushDanmaku(text);
-  }, [pushDanmaku]);
+  const sendControl = useCallback(
+    (text: string) => {
+      pushDanmaku(text);
+    },
+    [pushDanmaku],
+  );
   const [timeText, setTimeText] = useState(() =>
-    new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    new Date().toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
   );
 
   // ── 定时器 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeText(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+      setTimeText(
+        new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      );
     }, 1000);
 
     const updatePhoneBattery = () => {
@@ -104,14 +117,14 @@ export function RobotOperationScreen() {
     return () => sub.remove();
   }, [chatVisible]);
 
-  // ── 拍照 ──────────────────────────────────────────────────────────────────
+  // ── 拍照（通过服务端，后续改成通过本地也可以） ────────────────────────────────────────────
   async function handleCapturePhoto() {
     if (!robotUuid) return;
     try {
       setCapturing(true);
       sendControl('正在拍照...');
-      const data = await capturePhoto(robotUuid);
-      setPhotoUri(`data:image/${data.format || 'jpeg'};base64,${data.image}`);
+      // const data = await capturePhoto(robotUuid);
+      // setPhotoUri(`data:image/${data.format || 'jpeg'};base64,${data.image}`);
       sendControl('拍照成功');
     } catch (e: any) {
       sendControl(e.message || '拍照失败');
@@ -132,7 +145,11 @@ export function RobotOperationScreen() {
   // ── 聊天 ──────────────────────────────────────────────────────────────────
   function handleChatSend(text: string) {
     const userMsg: ChatMessage = { id: `${Date.now()}_u`, role: 'user', text };
-    const robotMsg: ChatMessage = { id: `${Date.now()}_r`, role: 'robot', text: `已收到：${text}` };
+    const robotMsg: ChatMessage = {
+      id: `${Date.now()}_r`,
+      role: 'robot',
+      text: `已收到：${text}`,
+    };
     setChatMessages(prev => [...prev, userMsg, robotMsg]);
     sendControl(`指令：${text}`);
   }
@@ -141,7 +158,6 @@ export function RobotOperationScreen() {
 
   return (
     <SafeAreaView style={styles.page}>
-
       {/* ── 顶部工具栏 ────────────────────────────────────────────────────── */}
       <View style={styles.topBar}>
         <View style={styles.leftTools}>
@@ -164,11 +180,17 @@ export function RobotOperationScreen() {
           />
 
           <View style={styles.speedBox}>
-            <Pressable onPress={() => setSpeed(v => Math.max(1, v - 1))} style={styles.speedBtn}>
+            <Pressable
+              onPress={() => setSpeed(v => Math.max(1, v - 1))}
+              style={styles.speedBtn}
+            >
               <Text style={styles.btnText}>-</Text>
             </Pressable>
             <Text style={styles.speedText}>速度 {speed}</Text>
-            <Pressable onPress={() => setSpeed(v => Math.min(10, v + 1))} style={styles.speedBtn}>
+            <Pressable
+              onPress={() => setSpeed(v => Math.min(10, v + 1))}
+              style={styles.speedBtn}
+            >
               <Text style={styles.btnText}>+</Text>
             </Pressable>
           </View>
@@ -181,18 +203,27 @@ export function RobotOperationScreen() {
             inactiveText="视频关"
           />
 
-          <Pressable onPress={handleCapturePhoto} disabled={capturing} style={styles.smallBtn}>
+          <Pressable
+            onPress={handleCapturePhoto}
+            disabled={capturing}
+            style={styles.smallBtn}
+          >
             <Text style={styles.btnText}>{capturing ? '拍照中' : '拍照'}</Text>
           </Pressable>
 
           <Pressable
-            onPress={() => navigation.navigate('机器人设置', { robotUuid, robotName })}
+            onPress={() =>
+              navigation.navigate('机器人设置', { robotUuid, robotName })
+            }
             style={styles.smallBtn}
           >
             <Text style={styles.btnText}>设置</Text>
           </Pressable>
 
-          <Pressable onPress={() => sendControl('急停')} style={styles.emergencyBtn}>
+          <Pressable
+            onPress={() => sendControl('急停')}
+            style={styles.emergencyBtn}
+          >
             <Text style={styles.emergencyText}>急停</Text>
           </Pressable>
         </View>
@@ -201,38 +232,55 @@ export function RobotOperationScreen() {
           <Text style={styles.infoText}>{headerText}</Text>
           <View style={styles.batteryInfo}>
             <Bot size={14} color="#DCE7FF" />
-            <Text style={styles.infoText}>{battery !== null ? `${battery}%` : '--'}</Text>
+            <Text style={styles.infoText}>
+              {battery !== null ? `${battery}%` : '--'}
+            </Text>
           </View>
           <View style={styles.batteryInfo}>
             <Smartphone size={14} color="#DCE7FF" />
-            <Text style={styles.infoText}>{phoneBattery !== null ? `${phoneBattery}%` : '--'}</Text>
+            <Text style={styles.infoText}>
+              {phoneBattery !== null ? `${phoneBattery}%` : '--'}
+            </Text>
           </View>
           <Text style={styles.infoText}>{timeText}</Text>
         </View>
       </View>
 
-      {/* ── 视频区域 ──────────────────────────────────────────────────────── */}
+      {/* ── 视频区域（直连机器狗 RTSP 流）─────────────────────────────────── */}
       <View style={styles.videoArea}>
-        {showVideo && photoUri ? (
-          <Image source={{ uri: photoUri }} style={styles.videoFrame} resizeMode="cover" />
+        {showVideo ? (
+          robotIp ? (
+            <RtspVideoPlayer robotIp={robotIp} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Text style={styles.placeholderText}>
+                未配置机器人 IP，无法获取视频流
+              </Text>
+            </View>
+          )
         ) : (
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              {showVideo ? '等待视频信号...' : '视频已关闭'}
-            </Text>
+            <Text style={styles.placeholderText}>视频已关闭</Text>
           </View>
         )}
 
         {/* ── 浮层控件 ────────────────────────────────────────────────────── */}
         <View style={styles.floatingLayer} pointerEvents="box-none">
-
           {/* 右上角圆形按钮 */}
-          <Pressable onPress={() => setChatVisible(true)} style={[styles.circleBtn, styles.chatPos]}>
+          <Pressable
+            onPress={() => setChatVisible(true)}
+            style={[styles.circleBtn, styles.chatPos]}
+          >
             <Text style={styles.btnText}>对话</Text>
           </Pressable>
 
-          <Pressable onPress={() => setMicEnabled(v => !v)} style={[styles.circleBtn, styles.micPos]}>
-            <Text style={styles.btnText}>{micEnabled ? '麦克风' : '已静音'}</Text>
+          <Pressable
+            onPress={() => setMicEnabled(v => !v)}
+            style={[styles.circleBtn, styles.micPos]}
+          >
+            <Text style={styles.btnText}>
+              {micEnabled ? '麦克风' : '已静音'}
+            </Text>
           </Pressable>
 
           {/* 左摇杆 */}
@@ -263,7 +311,10 @@ export function RobotOperationScreen() {
             <Pressable
               key={item.id}
               onPress={() => sendControl(item.label)}
-              style={[styles.actionBtn, { left: `${item.x}%` as any, top: `${item.y}%` as any }]}
+              style={[
+                styles.actionBtn,
+                { left: `${item.x}%` as any, top: `${item.y}%` as any },
+              ]}
             >
               <Text style={styles.actionBtnText}>{item.label}</Text>
             </Pressable>
@@ -281,7 +332,6 @@ export function RobotOperationScreen() {
           onSend={handleChatSend}
         />
       </View>
-
     </SafeAreaView>
   );
 }
@@ -373,10 +423,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     position: 'relative',
-  },
-  videoFrame: {
-    width: '100%',
-    height: '100%',
   },
   placeholder: {
     flex: 1,
