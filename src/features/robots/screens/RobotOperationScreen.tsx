@@ -57,7 +57,7 @@ const ACTION_BUTTONS = [
   { id: 'shake_hand', label: '打招呼', x: 64, y: 88 },
 ] as const;
 
-// ─── Screen ───────────────────────────────────────────────────────────────
+// ─── 屏幕 ───────────────────────────────────────────────────────────────
 export function RobotOperationScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();

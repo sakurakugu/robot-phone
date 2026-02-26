@@ -24,7 +24,8 @@ export function AddEnvironmentScreen() {
       return;
     }
 
-    if (!/^https?:\/\//i.test(trimmedUrl)) {
+    // 使用 new RegExp 避免被误识别为注释
+    if (!new RegExp('^https?://', 'i').test(trimmedUrl)) {
       setError('地址必须以 http:// 或 https:// 开头');
       return;
     }

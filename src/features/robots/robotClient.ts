@@ -119,6 +119,13 @@ export class RobotClient {
     return this.request(`/api/v1/logs${query}`);
   }
 
+  async markLog(message: string = '') {
+    return this.request('/api/v1/logs/mark', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
   getDownloadLogsUrl(startTime: string, endTime: string, appName?: string) {
     const params = new URLSearchParams({
       start_time: startTime,
@@ -133,7 +140,7 @@ export class RobotClient {
     return `${this.baseUrl}/api/v1/logs/download?${params.toString()}`;
   }
 
-  // Config Fields & Sections
+  // 配置 字段 & 集合
   async getConfigFields() {
     return this.request('/api/v1/config/fields');
   }
@@ -149,7 +156,7 @@ export class RobotClient {
     });
   }
 
-  // SDK Config
+  // SDK 配置
   async getSdkConfig() {
     return this.request('/api/v1/sdk/config');
   }
@@ -167,7 +174,7 @@ export class RobotClient {
     });
   }
 
-  // Motion Config
+  // Motion 配置
   async getMotionConfig() {
     return this.request('/api/v1/sdk/motion');
   }
@@ -185,7 +192,7 @@ export class RobotClient {
     });
   }
 
-  // Motion Service
+  // Motion 服务
   async restartMotion() {
     return this.request('/api/v1/sdk/motion/restart', {
       method: 'POST',

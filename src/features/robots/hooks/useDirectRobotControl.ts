@@ -226,7 +226,7 @@ export function useDirectRobotControl(
             }
           }
         } catch {
-          // ignore non-JSON messages
+          // 忽略不是 JSON 的消息
         }
       };
 

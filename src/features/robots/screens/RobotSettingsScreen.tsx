@@ -303,6 +303,14 @@ export function RobotSettingsScreen() {
     });
   };
 
+  const handleMarkLog = async () => {
+    if (!client) return;
+    await withLoading(async () => {
+      await client.markLog('手动标记');
+      setMessage('日志标记已写入');
+    });
+  };
+
   return (
     <Screen palette={palette} title="机器人设置" subtitle={subtitle}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -370,6 +378,12 @@ export function RobotSettingsScreen() {
             </Section>
 
             <Section title="高级功能">
+              <ActionRow
+                label="打日志标记"
+                subtitle="在机器人本地日志中写入可识别标记"
+                onPress={handleMarkLog}
+                loading={loading}
+              />
               <ActionRow
                 label="WiFi 设置"
                 subtitle="管理 WiFi 连接"

@@ -30,7 +30,7 @@ export function RobotWifiScreen() {
   const [message, setMessage] = useState('');
   const [client, setClient] = useState<RobotClient | null>(null);
 
-  // WiFi State
+  // WiFi 状态
   const [wifiSSID, setWifiSSID] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
   const [wifiList, setWifiList] = useState<any[]>([]);
@@ -124,7 +124,7 @@ export function RobotWifiScreen() {
         </Section>
       </ScrollView>
 
-      {/* WiFi List Modal */}
+      {/* WiFi 列表弹窗 */}
       <Modal visible={showWifiList} animationType="slide" transparent>
         <View
           style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
