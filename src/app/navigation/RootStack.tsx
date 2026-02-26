@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { RobotChatScreen } from '../../features/robots/screens/RobotChatScreen';
+import { RobotGroupControlScreen } from '../../features/robots/screens/RobotGroupControlScreen';
 import { RobotOperationScreen } from '../../features/robots/screens/RobotOperationScreen';
 import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
 import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
@@ -43,6 +44,7 @@ export function RootStack() {
       <Stack.Screen name="WiFi设置" component={RobotWifiScreen} />
       <Stack.Screen name="日志管理" component={RobotLogScreen} />
       <Stack.Screen name="高级配置" component={RobotConfigScreen} />
+      <Stack.Screen name="群控" component={RobotGroupControlScreen} />
       <Stack.Screen name="机器人对话" component={RobotChatScreen} />
       <Stack.Screen name="设置" component={SettingsScreen} />
       <Stack.Screen name="外观设置" component={AppearanceScreen} />

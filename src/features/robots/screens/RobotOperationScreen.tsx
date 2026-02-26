@@ -1,4 +1,4 @@
-﻿import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   ArrowLeft,
@@ -10,9 +10,11 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackHandler,
+  Dimensions,
+  Modal,
   PermissionsAndroid,
   Platform,
   Pressable,
@@ -57,6 +59,75 @@ const ACTION_BUTTONS = [
   { id: 'shake_hand', label: '打招呼', x: 64, y: 88 },
 ] as const;
 
+// ─── 速度滑条组件 ───
+function SpeedSlider({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (val: number) => void;
+}) {
+  const palette = usePalette();
+  const containerRef = useRef<View>(null);
+  const widthRef = useRef(0);
+  const pageXRef = useRef(0);
+
+  const applyPageX = (pageX: number) => {
+    const x = Math.max(0, pageX - pageXRef.current);
+    const w = widthRef.current;
+    if (!w) return;
+    // 速度范围 1-10
+    const ratio = Math.min(1, Math.max(0, x / w));
+    const val = Math.round(1 + ratio * 9); // 1 + 0..9
+    onChange(val);
+  };
+
+  const pct = ((value - 1) / 9) * 100;
+  const sliderWidth = 140;
+  const fillWidth = (pct / 100) * sliderWidth;
+  const thumbLeft = (pct / 100) * sliderWidth;
+  const trackStyle = useMemo(
+    () => [styles.speedSliderTrack, { backgroundColor: palette.surfaceAlt }],
+    [palette.surfaceAlt],
+  );
+  const fillStyle = useMemo(
+    () => [
+      styles.speedSliderFill,
+      { width: fillWidth, backgroundColor: palette.primary },
+    ],
+    [fillWidth, palette.primary],
+  );
+  const thumbStyle = useMemo(
+    () => [
+      styles.speedSliderThumb,
+      { left: thumbLeft, backgroundColor: palette.primary },
+    ],
+    [thumbLeft, palette.primary],
+  );
+
+  return (
+    <View
+      ref={containerRef}
+      style={styles.speedSliderContainer}
+      onLayout={() => {
+        containerRef.current?.measure((_x, _y, w, _h, px) => {
+          widthRef.current = w;
+          pageXRef.current = px;
+        });
+      }}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={e => applyPageX(e.nativeEvent.pageX)}
+      onResponderMove={e => applyPageX(e.nativeEvent.pageX)}
+    >
+      <View style={trackStyle}>
+        <View style={fillStyle} />
+      </View>
+      <View style={thumbStyle} />
+    </View>
+  );
+}
+
 // ─── 屏幕 ───────────────────────────────────────────────────────────────
 export function RobotOperationScreen() {
   const insets = useSafeAreaInsets();
@@ -82,6 +153,33 @@ export function RobotOperationScreen() {
   /** 双腿站立模式激活中（此时右摇杆禁用，左摇杆走 two_leg 通道） */
   const [twoLegStandActive, setTwoLegStandActive] = useState(false);
 
+  // 速度弹窗控制
+  const [speedPopoverVisible, setSpeedPopoverVisible] = useState(false);
+  const [speedPopoverPos, setSpeedPopoverPos] = useState({ x: 0, y: 0 });
+  const speedBtnRef = useRef<View>(null);
+  const speedPopoverWidth = 192;
+  const screenWidth = Dimensions.get('window').width;
+  const speedBtnStyle = useMemo(
+    () => [styles.speedBtn, { borderColor: palette.border }],
+    [palette.border],
+  );
+  const speedPopoverStyle = useMemo(
+    () => [
+      styles.speedPopover,
+      {
+        left: speedPopoverPos.x,
+        top: speedPopoverPos.y,
+        backgroundColor: palette.surface,
+        borderColor: palette.border,
+      },
+    ],
+    [palette.border, palette.surface, speedPopoverPos.x, speedPopoverPos.y],
+  );
+  const speedPopoverLabelStyle = useMemo(
+    () => [styles.speedPopoverLabel, { color: palette.text }],
+    [palette.text],
+  );
+
   // 连接机器狗得到遥测（电量、体温、在线状态）
   const dogTelemetry = useRobotTelemetry(robotIp, 3000);
 
@@ -91,6 +189,8 @@ export function RobotOperationScreen() {
   // 摇杆发送阶趾（ms），避免频繁刷新发送
   const leftJoyThrottleRef = useRef<number>(0);
   const rightJoyThrottleRef = useRef<number>(0);
+  // 急停双击保护：记录上次点击时间
+  const lastEstopPressRef = useRef<number>(0);
 
   // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
   const dogOnlineColor = dogTelemetry.online
@@ -318,23 +418,27 @@ export function RobotOperationScreen() {
             disabled={sdkModeLoading}
           />
 
-          <View style={styles.speedBox}>
-            <Pressable
-              onPress={() => setSpeed(v => Math.max(1, v - 1))}
-              style={[styles.speedBtn, { borderColor: palette.border }]}
-            >
-              <Text style={[styles.btnText, { color: palette.text }]}>-</Text>
-            </Pressable>
+          <Pressable
+            ref={speedBtnRef}
+            style={[styles.speedBox, speedBtnStyle]}
+            onPress={() => {
+              speedBtnRef.current?.measure((_x, _y, w, h, px, py) => {
+                const left = Math.max(
+                  8,
+                  Math.min(
+                    px + w / 2 - speedPopoverWidth / 2,
+                    screenWidth - speedPopoverWidth - 8,
+                  ),
+                );
+                setSpeedPopoverPos({ x: left, y: py + h + 4 });
+                setSpeedPopoverVisible(true);
+              });
+            }}
+          >
             <Text style={[styles.speedText, { color: palette.text }]}>
               速度 {speed}
             </Text>
-            <Pressable
-              onPress={() => setSpeed(v => Math.min(10, v + 1))}
-              style={[styles.speedBtn, { borderColor: palette.border }]}
-            >
-              <Text style={[styles.btnText, { color: palette.text }]}>+</Text>
-            </Pressable>
-          </View>
+          </Pressable>
 
           <Text style={[styles.switchLabel, { color: palette.text }]}>
             视频
@@ -367,8 +471,17 @@ export function RobotOperationScreen() {
 
           <Pressable
             onPress={() => {
-              directCtrl.sendEstop();
-              sendControl('急停');
+              const now = Date.now();
+              // 5秒内第二次点击才触发急停
+              if (now - lastEstopPressRef.current < 5000) {
+                directCtrl.sendEstop();
+                sendControl('已触发急停！');
+                // 重置时间，防止连续第三次点击又触发
+                lastEstopPressRef.current = 0;
+              } else {
+                sendControl('再次点击确认急停（5秒内）');
+                lastEstopPressRef.current = now;
+              }
             }}
             style={[
               styles.emergencyBtn,
@@ -446,7 +559,7 @@ export function RobotOperationScreen() {
       </View>
 
       {/* ── 视频区域（直连机器狗 RTSP 流）─────────────────────────────────── */}
-      <View style={[styles.videoArea, { backgroundColor: '#000000' }]}>
+      <View style={styles.videoArea}>
         {showVideo ? (
           robotIp ? (
             <RtspVideoPlayer robotIp={robotIp} />
@@ -634,6 +747,27 @@ export function RobotOperationScreen() {
           robotName={robotName}
         />
       </View>
+
+      {/* 速度设置弹窗 */}
+      <Modal
+        visible={speedPopoverVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSpeedPopoverVisible(false)}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setSpeedPopoverVisible(false)}
+        >
+          <View
+            onStartShouldSetResponder={() => true}
+            style={speedPopoverStyle}
+          >
+            <Text style={speedPopoverLabelStyle}>速度</Text>
+            <SpeedSlider value={speed} onChange={setSpeed} />
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -712,12 +846,10 @@ const styles = StyleSheet.create({
   },
   speedBtn: {
     borderWidth: 1,
-    borderColor: '#41506F',
     borderRadius: 6,
-    width: 24,
     height: 24,
-    alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   speedText: {
     color: '#DCE7FF',
@@ -726,6 +858,46 @@ const styles = StyleSheet.create({
   switchLabel: {
     color: '#DCE7FF',
     fontSize: 11,
+  },
+  speedSliderContainer: {
+    height: 32,
+    justifyContent: 'center',
+    width: 140,
+  },
+  speedSliderTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  speedSliderFill: {
+    height: '100%',
+  },
+  speedSliderThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
+    top: 8,
+    elevation: 2,
+  },
+  speedPopover: {
+    position: 'absolute',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    width: 192,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  speedPopoverLabel: {
+    fontSize: 12,
   },
 
   // ── 视频区域

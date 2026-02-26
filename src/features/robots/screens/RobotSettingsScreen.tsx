@@ -1,12 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Volume, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
@@ -18,7 +12,7 @@ import {
   Section,
 } from '../components/SettingsComponents';
 import { RobotClient } from '../robotClient';
-import type { Robot, RobotForm } from '../types';
+import type { RobotForm } from '../types';
 
 type RouteParams = {
   robotUuid: string;
@@ -174,7 +168,7 @@ function splitTags(input: string): string[] {
     .filter(Boolean);
 }
 
-// --- Main Screen ---
+// --- 主屏幕 ---
 
 export function RobotSettingsScreen() {
   const palette = usePalette();
@@ -184,14 +178,13 @@ export function RobotSettingsScreen() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [robot, setRobot] = useState<Robot | null>(null);
 
-  // Client State
+  // 客户端状态
   const [client, setClient] = useState<RobotClient | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  // Basic Info State
+  // 基本信息状态
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
   const [ip, setIp] = useState('');
@@ -199,7 +192,7 @@ export function RobotSettingsScreen() {
   const [sn, setSn] = useState('');
   const [tagsText, setTagsText] = useState('');
 
-  // Volume State
+  // 音量状态
   const [volume, setVolume] = useState(0);
   const [muted, setMuted] = useState(false);
 
@@ -215,7 +208,7 @@ export function RobotSettingsScreen() {
     }
   }, []);
 
-  // Initialize Client when IP changes
+  // 初始化客户端当IP改变时
   useEffect(() => {
     if (ip && !isConnected && !connecting) {
       const initClient = async () => {
@@ -227,15 +220,16 @@ export function RobotSettingsScreen() {
           setIsConnected(true);
           setMessage('已连接到机器人');
 
-          // Initial load
+          // 初始加载音量
           const volData = await c.getVolume();
           if (volData.success) {
             setVolume(volData.data.volume);
             setMuted(volData.data.muted);
           }
         } catch (e: any) {
-          console.log('Connect failed:', e);
-          // Don't show error immediately to avoid annoyance, just leave isConnected false
+          console.log('连接失败:', e);
+          setMessage(e.message || '连接失败');
+          // 连接失败时不立即显示错误，避免打扰用户，只是保持 isConnected 为 false
         } finally {
           setConnecting(false);
         }
@@ -247,7 +241,6 @@ export function RobotSettingsScreen() {
   const loadRobot = useCallback(async () => {
     await withLoading(async () => {
       const data = await fetchRobot(robotUuid);
-      setRobot(data);
       setName(data.name || '');
       setModel(data.model || '');
       setIp(data.ip || '');
@@ -261,10 +254,6 @@ export function RobotSettingsScreen() {
     loadRobot();
   }, [loadRobot]);
 
-  const subtitle = useMemo(
-    () => `${robotName || robot?.name || '未命名机器人'} · ${robotUuid || ''}`,
-    [robot?.name, robotName, robotUuid],
-  );
 
   async function handleSaveBasic() {
     const payload: RobotForm = {
@@ -312,7 +301,7 @@ export function RobotSettingsScreen() {
   };
 
   return (
-    <Screen palette={palette} title="机器人设置" subtitle={subtitle}>
+    <Screen palette={palette}>
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
           <Text style={[styles.message, { color: palette.warning }]}>
@@ -327,6 +316,7 @@ export function RobotSettingsScreen() {
             onChangeText={setName}
             placeholder="未设置"
           />
+          <InfoRow label="UUID" value={robotUuid || '-'} />
           <InputRow
             label="型号"
             value={model}

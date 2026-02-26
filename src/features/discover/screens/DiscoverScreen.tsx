@@ -1,6 +1,7 @@
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
+import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
 
 const discoverItems = [
@@ -19,10 +20,7 @@ export function DiscoverScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.title, { color: palette.text }]}>{item.title}</Text>
-            <Text style={[styles.desc, { color: palette.textMuted }]}>{item.desc}</Text>
-          </View>
+          <InfoCard title={item.title} desc={item.desc} />
         )}
       />
     </Screen>
@@ -34,18 +32,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     gap: 10,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  desc: {
-    fontSize: 12,
-    marginTop: 4,
   },
 });

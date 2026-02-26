@@ -21,6 +21,10 @@ import { RobotCard } from '../components/RobotCard';
 import { RobotFormModal } from '../components/RobotFormModal';
 import type { Robot, RobotForm } from '../types';
 
+const groupControlItems = [
+  { id: 'gc1', title: '群控', desc: '进入群控中心', route: '群控' },
+];
+
 export function RobotManagementScreen() {
   const palette = usePalette();
   const { homeOrientation, setHomeOrientation } = useAppPreferences();
@@ -102,6 +106,30 @@ export function RobotManagementScreen() {
         data={robots}
         keyExtractor={item => item.uuid}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={styles.groupList}>
+            {groupControlItems.map(item => (
+              <Pressable
+                key={item.id}
+                style={[
+                  styles.groupCard,
+                  {
+                    backgroundColor: palette.surface,
+                    borderColor: palette.border,
+                  },
+                ]}
+                onPress={() => navigation.navigate(item.route)}
+              >
+                <Text style={[styles.groupTitle, { color: palette.text }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.groupDesc, { color: palette.textMuted }]}>
+                  {item.desc}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={loadData} />
         }
@@ -177,5 +205,21 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 10,
   },
-  // card styles moved to RobotCard component
+  groupList: {
+    gap: 10,
+    paddingBottom: 8,
+  },
+  groupCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  groupDesc: {
+    fontSize: 12,
+    marginTop: 4,
+  },
 });

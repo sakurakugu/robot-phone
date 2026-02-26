@@ -11,22 +11,31 @@ export function Screen({
   children,
 }: {
   palette: Palette;
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
   headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const showHeader = !!title || !!subtitle || !!headerRight;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerTextWrap}>
-            <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
-            <Text style={[styles.subtitle, { color: palette.textMuted }]}>{subtitle}</Text>
+      {showHeader ? (
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTextWrap}>
+              {title ? (
+                <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+              ) : null}
+              {subtitle ? (
+                <Text style={[styles.subtitle, { color: palette.textMuted }]}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+            {headerRight ? <View>{headerRight}</View> : null}
           </View>
-          {headerRight ? <View>{headerRight}</View> : null}
         </View>
-      </View>
+      ) : null}
       {children}
     </SafeAreaView>
   );
@@ -38,8 +47,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 0,
+    paddingBottom: 6,
   },
   headerTop: {
     flexDirection: 'row',
