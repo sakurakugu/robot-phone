@@ -89,13 +89,13 @@ const BatteryIcon = getBatteryIcon(telemetry.power);
 
       {/* ── 遥测行：电量 + 体温 ─────────────────────────────────────────── */}
       <View style={styles.telemetryRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={styles.telemetryItemRow}>
           <BatteryIcon size={14} color={powerColor} />
           <Text style={[styles.telemetryItem, { color: powerColor }]}>
             {telemetry.power !== null ? `${telemetry.power}%` : '--'}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={styles.telemetryItemRow}>
           <Thermometer size={14} color={palette.textMuted} />
           <Text style={[styles.telemetryItem, { color: palette.textMuted }]}>
             {telemetry.temp !== null ? `${telemetry.temp.toFixed(1)}°C` : '--'}
@@ -190,6 +190,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 4,
+  },
+  telemetryItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   telemetryItem: {
     fontSize: 13,

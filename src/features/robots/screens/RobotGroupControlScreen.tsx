@@ -15,7 +15,7 @@ const groupControls = [
     id: 'd1',
     title: 'D1 机器狗群控',
     desc: '适用于 D1 机型的编队与统一调度',
-    route: null,
+    route: 'D1 机器狗群控',
   },
 ];
 

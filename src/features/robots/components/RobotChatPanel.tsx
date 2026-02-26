@@ -108,6 +108,40 @@ export function RobotChatPanel({
     const status = isConnected ? '已连接' : '未连接';
     return `${robotName || '未命名机器人'} · ${status}`;
   }, [robotName, isConnected]);
+  const themedStyles = useMemo(
+    () => ({
+      bubbleLeft: {
+        backgroundColor: palette.surface,
+        borderColor: palette.border,
+        borderWidth: 1,
+      },
+      bubbleRight: { backgroundColor: palette.primary },
+      metaLabelLeft: { color: palette.textMuted },
+      metaLabelRight: { color: 'rgba(255,255,255,0.7)' },
+      metaTimeLeft: { color: palette.textMuted },
+      metaTimeRight: { color: 'rgba(255,255,255,0.6)' },
+      messageLeft: { color: palette.text },
+      messageRight: { color: '#FFFFFF' },
+      actionLabelLeft: { color: palette.textMuted },
+      actionLabelRight: { color: 'rgba(255,255,255,0.7)' },
+      statusHeader: { borderBottomColor: palette.border },
+      dotConnected: { backgroundColor: palette.success },
+      dotDisconnected: { backgroundColor: palette.textMuted },
+      statusText: { color: palette.textMuted },
+      emptyText: { color: palette.textMuted },
+      footer: {
+        borderTopColor: palette.border,
+        backgroundColor: palette.surface,
+      },
+      input: {
+        borderColor: palette.border,
+        color: palette.text,
+      },
+      sendBtnRobot: { backgroundColor: palette.success },
+      sendBtnAi: { backgroundColor: palette.primary },
+    }),
+    [palette],
+  );
 
   // 连接 / 断连
   useEffect(() => {
@@ -277,16 +311,7 @@ export function RobotChatPanel({
       if (item.loading) {
         return (
           <View style={[styles.bubbleRow, styles.bubbleRowLeft]}>
-            <View
-              style={[
-                styles.bubble,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                  borderWidth: 1,
-                },
-              ]}
-            >
+            <View style={[styles.bubble, themedStyles.bubbleLeft]}>
               <ActivityIndicator size="small" color={palette.primary} />
             </View>
           </View>
@@ -303,24 +328,14 @@ export function RobotChatPanel({
           <View
             style={[
               styles.bubble,
-              isRight
-                ? { backgroundColor: palette.primary }
-                : {
-                    backgroundColor: palette.surface,
-                    borderColor: palette.border,
-                    borderWidth: 1,
-                  },
+              isRight ? themedStyles.bubbleRight : themedStyles.bubbleLeft,
             ]}
           >
             <View style={styles.bubbleMeta}>
               <Text
                 style={[
                   styles.metaLabel,
-                  {
-                    color: isRight
-                      ? 'rgba(255,255,255,0.7)'
-                      : palette.textMuted,
-                  },
+                  isRight ? themedStyles.metaLabelRight : themedStyles.metaLabelLeft,
                 ]}
               >
                 {isUser
@@ -332,21 +347,17 @@ export function RobotChatPanel({
               <Text
                 style={[
                   styles.metaTime,
-                  {
-                    color: isRight
-                      ? 'rgba(255,255,255,0.6)'
-                      : palette.textMuted,
-                  },
+                  isRight ? themedStyles.metaTimeRight : themedStyles.metaTimeLeft,
                 ]}
               >
                 {formatTime(item.timestamp)}
               </Text>
             </View>
             <Text
-              style={{
-                color: isRight ? '#FFFFFF' : palette.text,
-                lineHeight: 20,
-              }}
+              style={[
+                styles.messageText,
+                isRight ? themedStyles.messageRight : themedStyles.messageLeft,
+              ]}
             >
               {item.text}
             </Text>
@@ -355,11 +366,9 @@ export function RobotChatPanel({
                 <Text
                   style={[
                     styles.actionLabel,
-                    {
-                      color: isRight
-                        ? 'rgba(255,255,255,0.7)'
-                        : palette.textMuted,
-                    },
+                    isRight
+                      ? themedStyles.actionLabelRight
+                      : themedStyles.actionLabelLeft,
                   ]}
                 >
                   ⚡ {item.actions.join(', ')}
@@ -370,7 +379,7 @@ export function RobotChatPanel({
         </View>
       );
     },
-    [palette],
+    [palette, themedStyles],
   );
 
   return (
@@ -381,27 +390,21 @@ export function RobotChatPanel({
     >
       {/* 顶部状态栏 */}
       {showStatusHeader && (
-        <View
-          style={[styles.statusHeader, { borderBottomColor: palette.border }]}
-        >
+        <View style={[styles.statusHeader, themedStyles.statusHeader]}>
           <View
             style={[
               styles.dot,
-              {
-                backgroundColor: isConnected
-                  ? palette.success
-                  : palette.textMuted,
-              },
+              isConnected ? themedStyles.dotConnected : themedStyles.dotDisconnected,
             ]}
           />
-          <Text style={[styles.statusText, { color: palette.textMuted }]}>
+          <Text style={[styles.statusText, themedStyles.statusText]}>
             {statusText}
           </Text>
           {!isConnected && (
             <ActivityIndicator
               size="small"
               color={palette.primary}
-              style={{ marginLeft: 6 }}
+              style={styles.statusSpinner}
             />
           )}
         </View>
@@ -409,7 +412,7 @@ export function RobotChatPanel({
 
       {messages.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={[styles.emptyText, { color: palette.textMuted }]}>
+          <Text style={[styles.emptyText, themedStyles.emptyText]}>
             还没有对话记录，发送一条消息开始吧！
           </Text>
         </View>
@@ -423,20 +426,9 @@ export function RobotChatPanel({
         />
       )}
 
-      <View
-        style={[
-          styles.footer,
-          {
-            borderTopColor: palette.border,
-            backgroundColor: palette.surface,
-          },
-        ]}
-      >
+      <View style={[styles.footer, themedStyles.footer]}>
         <TextInput
-          style={[
-            styles.input,
-            { borderColor: palette.border, color: palette.text },
-          ]}
+          style={[styles.input, themedStyles.input]}
           placeholder="输入消息... (支持 {{action=xxx}} 格式)"
           placeholderTextColor={palette.textMuted}
           value={input}
@@ -448,17 +440,15 @@ export function RobotChatPanel({
           <Pressable
             style={[
               styles.sendBtn,
-              {
-                backgroundColor: palette.success,
-                opacity: !isConnected || !input.trim() ? 0.5 : 1,
-              },
+              themedStyles.sendBtnRobot,
+              !isConnected || !input.trim()
+                ? styles.sendBtnDisabled
+                : styles.sendBtnEnabled,
             ]}
             disabled={!isConnected || !input.trim()}
             onPress={() => handleSend('robot')}
           >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
+            <View style={styles.sendIconRow}>
               {/* <Text style={styles.sendBtnText}>发给</Text> */}
               <Bot size={14} color="#FFFFFF" />
             </View>
@@ -466,17 +456,15 @@ export function RobotChatPanel({
           <Pressable
             style={[
               styles.sendBtn,
-              {
-                backgroundColor: palette.primary,
-                opacity: !isConnected || !input.trim() ? 0.5 : 1,
-              },
+              themedStyles.sendBtnAi,
+              !isConnected || !input.trim()
+                ? styles.sendBtnDisabled
+                : styles.sendBtnEnabled,
             ]}
             disabled={!isConnected || !input.trim()}
             onPress={() => handleSend('ai')}
           >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
+            <View style={styles.sendIconRow}>
               {/* <Text style={styles.sendBtnText}>发给</Text> */}
               <Send size={14} color="#FFFFFF" />
               {/* <View style={{ transform: [{ rotate: '90deg' }] }}>
@@ -509,6 +497,9 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
+  },
+  statusSpinner: {
+    marginLeft: 6,
   },
   empty: {
     flex: 1,
@@ -562,6 +553,9 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 11,
   },
+  messageText: {
+    lineHeight: 20,
+  },
   footer: {
     flexDirection: 'row',
     // alignItems: 'flex-end',
@@ -588,6 +582,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignItems: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.5,
+  },
+  sendBtnEnabled: {
+    opacity: 1,
+  },
+  sendIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   sendBtnText: {
     color: '#FFFFFF',

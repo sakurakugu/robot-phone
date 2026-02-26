@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
@@ -15,22 +15,38 @@ type SettingsRowProps = {
 
 function SettingsRow({ label, value, onPress, showChevron = true, isLast = false }: SettingsRowProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      rowNormal: { backgroundColor: palette.surface },
+      rowPressed: { backgroundColor: palette.surfaceAlt },
+      label: { color: palette.text },
+      value: { color: palette.textMuted },
+      chevron: { color: palette.textMuted },
+      divider: { backgroundColor: palette.border },
+    }),
+    [palette],
+  );
   return (
     <>
       <Pressable
-        style={({ pressed }) => [styles.row, { backgroundColor: pressed ? palette.surfaceAlt : palette.surface }]}
+        style={({ pressed }) => [
+          styles.row,
+          pressed ? themedStyles.rowPressed : themedStyles.rowNormal,
+        ]}
         onPress={onPress}
         android_ripple={{ color: palette.surfaceAlt }}
       >
-        <Text style={[styles.rowLabel, { color: palette.text }]}>{label}</Text>
+        <Text style={[styles.rowLabel, themedStyles.label]}>{label}</Text>
         <View style={styles.rowRight}>
-          {value ? <Text style={[styles.rowValue, { color: palette.textMuted }]}>{value}</Text> : null}
+          {value ? (
+            <Text style={[styles.rowValue, themedStyles.value]}>{value}</Text>
+          ) : null}
           {showChevron && (
-            <Text style={[styles.chevron, { color: palette.textMuted }]}>›</Text>
+            <Text style={[styles.chevron, themedStyles.chevron]}>›</Text>
           )}
         </View>
       </Pressable>
-      {!isLast && <View style={[styles.divider, { backgroundColor: palette.border }]} />}
+      {!isLast && <View style={[styles.divider, themedStyles.divider]} />}
     </>
   );
 }
@@ -42,10 +58,17 @@ type SectionProps = {
 
 function Section({ title, children }: SectionProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      header: { color: palette.textMuted },
+      group: { borderColor: palette.border },
+    }),
+    [palette],
+  );
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionHeader, { color: palette.textMuted }]}>{title}</Text>
-      <View style={[styles.sectionGroup, { borderColor: palette.border }]}>
+      <Text style={[styles.sectionHeader, themedStyles.header]}>{title}</Text>
+      <View style={[styles.sectionGroup, themedStyles.group]}>
         {children}
       </View>
     </View>
@@ -68,6 +91,12 @@ export function SettingsScreen() {
   const { themeMode, homeOrientation } = useAppPreferences();
   const navigation = useNavigation<any>();
   const [activeEnvName, setActiveEnvName] = useState(getActiveEnvironment().name);
+  const themedStyles = useMemo(
+    () => ({
+      container: { flex: 1, backgroundColor: palette.background },
+    }),
+    [palette],
+  );
 
   const reload = useCallback(() => {
     setActiveEnvName(getActiveEnvironment().name);
@@ -77,7 +106,7 @@ export function SettingsScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: palette.background }}
+      style={themedStyles.container}
       contentContainerStyle={styles.content}
     >
       <Section title="外观">

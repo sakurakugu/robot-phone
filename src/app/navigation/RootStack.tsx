@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
+import { D1ControlScreen } from '../../features/robots/group-control/screens/D1ControlScreen';
 import { X2ControlScreen } from '../../features/robots/group-control/screens/X2ControlScreen';
 import { X2HaidilaoScreen } from '../../features/robots/group-control/screens/X2HaidilaoScreen';
 import { X2LingChuangScreen } from '../../features/robots/group-control/screens/X2LingChuangScreen';
@@ -54,6 +55,7 @@ export function RootStack() {
       <Stack.Screen name="高级配置" component={RobotConfigScreen} />
       <Stack.Screen name="群控" component={RobotGroupControlScreen} />
       <Stack.Screen name="机器人对话" component={RobotChatScreen} />
+      <Stack.Screen name="D1 机器狗群控" component={D1ControlScreen} />
       <Stack.Screen name="X2 机器人控制" component={X2ControlScreen} />
       <Stack.Screen name="X2 普通动作" component={X2NormalScreen} />
       <Stack.Screen name="X2 灵创动作" component={X2LingChuangScreen} />

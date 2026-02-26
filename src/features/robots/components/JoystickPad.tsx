@@ -12,6 +12,12 @@ type JoystickProps = {
   onEnd?: () => void;
   /** 禁用摇杆：不响应触摸，显示半透明 */
   disabled?: boolean;
+  colors?: {
+    outer?: string;
+    outerBorder?: string;
+    stick?: string;
+    stickBorder?: string;
+  };
 };
 
 /**
@@ -22,6 +28,7 @@ export function JoystickPad({
   onMove,
   onEnd,
   disabled = false,
+  colors,
 }: JoystickProps) {
   const animX = useRef(new Animated.Value(0)).current;
   const animY = useRef(new Animated.Value(0)).current;
@@ -86,10 +93,23 @@ export function JoystickPad({
 
   return (
     <View style={[styles.joystickWrap, disabled && styles.joystickDisabled]}>
-      <View style={styles.joystickOuter} {...panResponder.panHandlers}>
+      <View
+        style={[
+          styles.joystickOuter,
+          {
+            backgroundColor: colors?.outer ?? 'rgba(255,255,255,0.12)',
+            borderColor: colors?.outerBorder ?? 'rgba(255,255,255,0.25)',
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
         <Animated.View
           style={[
             styles.joystickStick,
+            {
+              backgroundColor: colors?.stick ?? 'rgba(255,255,255,0.45)',
+              borderColor: colors?.stickBorder ?? 'rgba(255,255,255,0.5)',
+            },
             { transform: [{ translateX: animX }, { translateY: animY }] },
           ]}
         />
@@ -110,9 +130,7 @@ const styles = StyleSheet.create({
     width: JOYSTICK_SIZE,
     height: JOYSTICK_SIZE,
     borderRadius: JOYSTICK_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -120,8 +138,6 @@ const styles = StyleSheet.create({
     width: STICK_SIZE,
     height: STICK_SIZE,
     borderRadius: STICK_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.45)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
   },
 });

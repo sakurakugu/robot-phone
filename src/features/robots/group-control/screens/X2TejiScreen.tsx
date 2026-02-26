@@ -3,7 +3,7 @@
  * 对应 Android TejiActivity
  */
 import { useRoute } from '@react-navigation/native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../../app/theme/palette';
 import { Screen } from '../../../../shared/ui/Screen';
@@ -15,11 +15,17 @@ export function X2TejiScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
   const ip: string = route.params?.ip ?? '';
+  const themedStyles = useMemo(
+    () => ({
+      warning: { color: palette.danger },
+    }),
+    [palette],
+  );
 
   return (
     <Screen palette={palette} title="特技动作" subtitle={`设备：${ip}`}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.warning, { color: '#e53935' }]}>
+        <Text style={[styles.warning, themedStyles.warning]}>
           ⚠️ 高难度动作，请确保场地安全，远离人群！
         </Text>
         <View style={styles.grid}>

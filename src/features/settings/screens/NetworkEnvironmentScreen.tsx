@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     Alert,
     Pressable,
@@ -21,6 +21,33 @@ export function NetworkEnvironmentScreen() {
   const navigation = useNavigation<any>();
   const [environments, setEnvironments] = useState(listEnvironments());
   const [activeId, setActiveId] = useState(getActiveEnvironment().id);
+  const themedStyles = useMemo(
+    () => ({
+      container: { flex: 1, backgroundColor: palette.background },
+      sectionHeader: { color: palette.textMuted },
+      group: { borderColor: palette.border },
+      envRow: { backgroundColor: palette.surface },
+      envNameActive: { color: palette.primary },
+      envNameInactive: { color: palette.text },
+      activeBadge: { backgroundColor: palette.primary },
+      envUrl: { color: palette.textMuted },
+      radioActive: {
+        borderColor: palette.primary,
+        backgroundColor: palette.primary,
+      },
+      radioInactive: {
+        borderColor: palette.border,
+        backgroundColor: 'transparent',
+      },
+      deleteBtn: { borderColor: palette.border },
+      deleteBtnText: { color: palette.danger },
+      divider: { backgroundColor: palette.border },
+      addRow: { backgroundColor: palette.surface },
+      addRowText: { color: palette.primary },
+      tip: { color: palette.textMuted },
+    }),
+    [palette],
+  );
 
   const reload = useCallback(() => {
     setEnvironments(listEnvironments());
@@ -50,21 +77,19 @@ export function NetworkEnvironmentScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: palette.background }}
+      style={themedStyles.container}
       contentContainerStyle={styles.content}
     >
-      <Text style={[styles.sectionHeader, { color: palette.textMuted }]}>
+      <Text style={[styles.sectionHeader, themedStyles.sectionHeader]}>
         当前环境列表
       </Text>
-      <View style={[styles.group, { borderColor: palette.border }]}>
+      <View style={[styles.group, themedStyles.group]}>
         {environments.map((env, idx) => {
           const active = env.id === activeId;
           const isDefault = !env.id.startsWith('custom-');
           return (
             <View key={env.id}>
-              <View
-                style={[styles.envRow, { backgroundColor: palette.surface }]}
-              >
+              <View style={[styles.envRow, themedStyles.envRow]}>
                 <Pressable
                   style={styles.envMain}
                   onPress={() => activate(env.id)}
@@ -74,7 +99,9 @@ export function NetworkEnvironmentScreen() {
                       <Text
                         style={[
                           styles.envName,
-                          { color: active ? palette.primary : palette.text },
+                          active
+                            ? themedStyles.envNameActive
+                            : themedStyles.envNameInactive,
                         ]}
                       >
                         {env.name}
@@ -83,68 +110,61 @@ export function NetworkEnvironmentScreen() {
                         <View
                           style={[
                             styles.activeBadge,
-                            { backgroundColor: palette.primary },
+                            themedStyles.activeBadge,
                           ]}
                         >
                           <Text style={styles.activeBadgeText}>使用中</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.envUrl, { color: palette.textMuted }]}>
+                    <Text style={[styles.envUrl, themedStyles.envUrl]}>
                       {env.baseUrl}
                     </Text>
                   </View>
                   <View
                     style={[
                       styles.radio,
-                      {
-                        borderColor: active ? palette.primary : palette.border,
-                        backgroundColor: active
-                          ? palette.primary
-                          : 'transparent',
-                      },
+                      active
+                        ? themedStyles.radioActive
+                        : themedStyles.radioInactive,
                     ]}
                   />
                 </Pressable>
                 {!isDefault && (
                   <Pressable
-                    style={[styles.deleteBtn, { borderColor: palette.border }]}
+                    style={[styles.deleteBtn, themedStyles.deleteBtn]}
                     onPress={() => handleRemove(env.id, env.name)}
                     hitSlop={8}
                   >
-                    <Text
-                      style={[styles.deleteBtnText, { color: palette.danger }]}
-                    >
+                    <Text style={[styles.deleteBtnText, themedStyles.deleteBtnText]}>
                       删除
                     </Text>
                   </Pressable>
                 )}
               </View>
               {idx < environments.length - 1 && (
-                <View
-                  style={[styles.divider, { backgroundColor: palette.border }]}
-                />
+                <View style={[styles.divider, themedStyles.divider]} />
               )}
             </View>
           );
         })}
       </View>
 
-      <Text style={[styles.sectionHeader, { color: palette.textMuted }]}>
+      <Text style={[styles.sectionHeader, themedStyles.sectionHeader]}>
         操作
       </Text>
-      <View style={[styles.group, { borderColor: palette.border }]}>
+      <View style={[styles.group, themedStyles.group]}>
         <Pressable
-          style={[styles.addRow, { backgroundColor: palette.surface }]}
+          style={[styles.addRow, themedStyles.addRow]}
           onPress={() => navigation.navigate('添加配置环境')}
         >
-          <Text style={[styles.addRowText, { color: palette.primary }]}>
+          <Text style={[styles.addRowText, themedStyles.addRowText]}>
             + 添加新环境
           </Text>
         </Pressable>
       </View>
 
-      <Text style={[styles.tip, { color: palette.textMuted }]}>
+      <Text style={[styles.tip, themedStyles.tip]}>
         提示：点击某一环境切换到该环境。手机连接服务端时请填写电脑在同一 Wi-Fi
         下的 IP 地址（如 http://192.168.x.x:9000）。
       </Text>

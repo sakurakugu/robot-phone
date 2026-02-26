@@ -38,6 +38,13 @@ export function AddRobotScreen() {
     messageTone === 'error' ? palette.danger : palette.warning;
 
   const isFormValid = useMemo(() => Boolean(name.trim()), [name]);
+  const themedStyles = useMemo(
+    () => ({
+      scanBtn: { backgroundColor: palette.primary },
+      primaryBtn: { backgroundColor: palette.primary },
+    }),
+    [palette],
+  );
   const existingUuids = useMemo(
     () => new Set(robots.map(r => r.uuid)),
     [robots],
@@ -158,10 +165,8 @@ export function AddRobotScreen() {
           <Pressable
             style={[
               styles.scanBtn,
-              {
-                backgroundColor: palette.primary,
-                opacity: discovering ? 0.6 : 1,
-              },
+              themedStyles.scanBtn,
+              discovering ? styles.btnDisabled : styles.btnEnabled,
             ]}
             onPress={handleDiscover}
             disabled={discovering}
@@ -319,10 +324,8 @@ export function AddRobotScreen() {
           <Pressable
             style={[
               styles.primaryBtn,
-              {
-                backgroundColor: palette.primary,
-                opacity: adding ? 0.6 : 1,
-              },
+              themedStyles.primaryBtn,
+              adding ? styles.btnDisabled : styles.btnEnabled,
             ]}
             onPress={handleAddDiscovered}
             disabled={adding}
@@ -335,10 +338,8 @@ export function AddRobotScreen() {
           <Pressable
             style={[
               styles.primaryBtn,
-              {
-                backgroundColor: palette.primary,
-                opacity: !isFormValid || adding ? 0.6 : 1,
-              },
+              themedStyles.primaryBtn,
+              !isFormValid || adding ? styles.btnDisabled : styles.btnEnabled,
             ]}
             onPress={handleManualAdd}
             disabled={!isFormValid || adding}
@@ -459,5 +460,11 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnEnabled: {
+    opacity: 1,
   },
 });
