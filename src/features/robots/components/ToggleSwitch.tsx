@@ -7,6 +7,8 @@ type ToggleSwitchProps = {
   onValueChange: (v: boolean) => void;
   activeText: string;
   inactiveText: string;
+  /** 禁用开关，切换进行中时使用 */
+  disabled?: boolean;
 };
 
 export function ToggleSwitch({
@@ -14,16 +16,19 @@ export function ToggleSwitch({
   onValueChange,
   activeText,
   inactiveText,
+  disabled = false,
 }: ToggleSwitchProps) {
   const palette = usePalette();
 
   return (
     <Pressable
-      onPress={() => onValueChange(!value)}
+      onPress={() => !disabled && onValueChange(!value)}
+      disabled={disabled}
       style={[
         styles.toggleSwitch,
         { backgroundColor: value ? palette.primary : palette.surfaceAlt },
         value ? null : { borderWidth: 1, borderColor: palette.border },
+        disabled ? { opacity: 0.45 } : null,
       ]}
     >
       <View

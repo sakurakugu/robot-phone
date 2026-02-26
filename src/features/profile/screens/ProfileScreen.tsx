@@ -7,8 +7,7 @@ import { Screen } from '../../../shared/ui/Screen';
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
   { id: 'm2', title: '参数管理', desc: '速度、阈值、巡检间隔等' },
-  { id: 'm3', title: '设备管理', desc: '绑定设备、固件升级、连接状态' },
-  { id: 'm4', title: '账号与安全', desc: '权限、登录设备、隐私配置' },
+  { id: 'm3', title: '账号与安全', desc: '权限、登录设备、隐私配置' },
 ];
 
 export function ProfileScreen() {

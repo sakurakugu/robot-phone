@@ -1,21 +1,27 @@
-﻿import { useNavigation, useRoute } from '@react-navigation/native';
+﻿import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   ArrowLeft,
   Bot,
+  Mic,
+  MicOff,
   Smartphone,
   Thermometer,
   Wifi,
   WifiOff,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
+  PermissionsAndroid,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { getBatteryLevel } from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
@@ -29,6 +35,7 @@ import {
   useStatusDanmaku,
 } from '../components/StatusDanmaku';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { useDirectRobotControl } from '../hooks/useDirectRobotControl';
 import { useRobotTelemetry } from '../hooks/useRobotTelemetry';
 
 type RouteParams = {
@@ -61,15 +68,29 @@ export function RobotOperationScreen() {
 
   const [controlMode, setControlMode] = useState<ControlMode>('move');
   const [sdkMode, setSdkMode] = useState(true);
+  /** SDK 模式切换进行中，切换完成前禁用开关 */
+  const [sdkModeLoading, setSdkModeLoading] = useState(false);
+  const sdkModeLoadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [showVideo, setShowVideo] = useState(true);
   const [speed, setSpeed] = useState(5);
   const [micEnabled, setMicEnabled] = useState(true);
   const [phoneBattery, setPhoneBattery] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
+  /** 双腿站立模式激活中（此时右摇杆禁用，左摇杆走 two_leg 通道） */
+  const [twoLegStandActive, setTwoLegStandActive] = useState(false);
 
   // 连接机器狗得到遥测（电量、体温、在线状态）
   const dogTelemetry = useRobotTelemetry(robotIp, 3000);
+
+  // 直连机器狗控制（同局域网时绕过云端服务器）
+  const directCtrl = useDirectRobotControl(robotIp);
+
+  // 摇杆发送阶趾（ms），避免频繁刷新发送
+  const leftJoyThrottleRef = useRef<number>(0);
+  const rightJoyThrottleRef = useRef<number>(0);
 
   // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
   const dogOnlineColor = dogTelemetry.online
@@ -150,21 +171,82 @@ export function RobotOperationScreen() {
     return () => sub.remove();
   }, [chatVisible]);
 
-  // ── 拍照（通过服务端，后续改成通过本地也可以） ────────────────────────────────────────────
+  // ── 拍照：通过直连 WebSocket 触发，机器人回传 base64，保存到相册 ──────────
   async function handleCapturePhoto() {
-    if (!robotUuid) return;
+    if (!robotIp) {
+      sendControl('未配置机器人 IP，无法拍照');
+      return;
+    }
+    if (capturing) {
+      return;
+    }
     try {
       setCapturing(true);
       sendControl('正在拍照...');
-      // const data = await capturePhoto(robotUuid);
-      // setPhotoUri(`data:image/${data.format || 'jpeg'};base64,${data.image}`);
-      sendControl('拍照成功');
+      directCtrl.sendCameraCapture();
+      // 结果通过 setOnPhotoReceived 回调返回，见下方 useEffect
     } catch (e: any) {
       sendControl(e.message || '拍照失败');
-    } finally {
       setCapturing(false);
     }
   }
+
+  // ── 注册直连响应回调 ───────────────────────────────────────────────────────
+  useEffect(() => {
+    // 拍照结果回调
+    directCtrl.setOnPhotoReceived(async (base64: string, format: string) => {
+      try {
+        const ext = format === 'png' ? 'png' : 'jpg';
+        const dir = ReactNativeBlobUtil.fs.dirs.CacheDir;
+        const filePath = `${dir}/robot_photo_${Date.now()}.${ext}`;
+        await ReactNativeBlobUtil.fs.writeFile(filePath, base64, 'base64');
+
+        // Android 13以下需要 WRITE_EXTERNAL_STORAGE 权限
+        if (Platform.OS === 'android' && Platform.Version < 33) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            sendControl('存储权限被拒绝，照片未保存');
+            setCapturing(false);
+            return;
+          }
+        }
+
+        await CameraRoll.save(`file://${filePath}`, { type: 'photo' });
+        sendControl('照片已保存到相册');
+      } catch (e: any) {
+        sendControl(`保存相册失败: ${e.message}`);
+      } finally {
+        setCapturing(false);
+      }
+    });
+
+    // SDK 模式切换结果回调
+    directCtrl.setOnSdkModeResponse(
+      (success: boolean, sdkModeResult?: boolean, error?: string) => {
+        // 清除超时保护计时器
+        if (sdkModeLoadingTimeoutRef.current !== null) {
+          clearTimeout(sdkModeLoadingTimeoutRef.current);
+          sdkModeLoadingTimeoutRef.current = null;
+        }
+        setSdkModeLoading(false);
+        if (success) {
+          setSdkMode(sdkModeResult ?? false);
+          sendControl(`已切换到 ${sdkModeResult ? 'SDK' : '遥控'} 模式`);
+        } else {
+          // 切换失败，开关保持原有状态（不更新 sdkMode）
+          sendControl(`模式切换失败: ${error ?? '未知错误'}`);
+        }
+      },
+    );
+
+    return () => {
+      directCtrl.setOnPhotoReceived(null);
+      directCtrl.setOnSdkModeResponse(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directCtrl]);
 
   function handleGoBack() {
     if (chatVisible) {
@@ -201,16 +283,39 @@ export function RobotOperationScreen() {
 
           <ToggleSwitch
             value={controlMode === 'pose'}
-            onValueChange={v => setControlMode(v ? 'pose' : 'move')}
+            onValueChange={v => {
+              const next: ControlMode = v ? 'pose' : 'move';
+              setControlMode(next);
+              // 切换模式时退出双腿站立
+              if (twoLegStandActive) {
+                setTwoLegStandActive(false);
+                directCtrl.sendAction('cancel_two_leg_stand');
+              }
+              directCtrl.sendSwitchMode(next);
+              sendControl(`切换到${next === 'pose' ? '姿态' : '移动'}模式`);
+            }}
             activeText="姿态"
             inactiveText="移动"
           />
 
           <ToggleSwitch
             value={sdkMode}
-            onValueChange={setSdkMode}
-            activeText="SDK"
-            inactiveText="遥控"
+            onValueChange={v => {
+              // 不立即更新开关状态，等待服务器确认后再更新
+              setSdkModeLoading(true);
+              directCtrl.sendSdkMode(v);
+              // 30 秒超时保护，避免开关永久卡住
+              if (sdkModeLoadingTimeoutRef.current !== null) {
+                clearTimeout(sdkModeLoadingTimeoutRef.current);
+              }
+              sdkModeLoadingTimeoutRef.current = setTimeout(() => {
+                setSdkModeLoading(false);
+                sendControl('模式切换超时，请重试');
+              }, 30000);
+            }}
+            activeText={sdkModeLoading ? '切换中' : 'SDK'}
+            inactiveText={sdkModeLoading ? '切换中' : '遥控'}
+            disabled={sdkModeLoading}
           />
 
           <View style={styles.speedBox}>
@@ -261,7 +366,10 @@ export function RobotOperationScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => sendControl('急停')}
+            onPress={() => {
+              directCtrl.sendEstop();
+              sendControl('急停');
+            }}
             style={[
               styles.emergencyBtn,
               {
@@ -277,6 +385,19 @@ export function RobotOperationScreen() {
         </View>
 
         <View style={styles.rightInfo}>
+          {/* 直连状态指示（小点） */}
+          {robotIp ? (
+            <View
+              style={[
+                styles.directDot,
+                {
+                  backgroundColor: directCtrl.isConnected
+                    ? palette.success
+                    : palette.danger,
+                },
+              ]}
+            />
+          ) : null}
           <Text style={[styles.infoText, { color: palette.text }]}>
             {headerText}
           </Text>
@@ -377,7 +498,11 @@ export function RobotOperationScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => setMicEnabled(v => !v)}
+            onPress={() => {
+              const nextVal = !micEnabled;
+              setMicEnabled(nextVal);
+              directCtrl.sendMicControl(nextVal);
+            }}
             style={[
               styles.circleBtn,
               styles.micPos,
@@ -388,12 +513,14 @@ export function RobotOperationScreen() {
               },
             ]}
           >
-            <Text style={[styles.btnText, { color: palette.text }]}>
-              {micEnabled ? '麦克风' : '已静音'}
-            </Text>
+            {micEnabled ? (
+              <Mic size={24} color={palette.text} />
+            ) : (
+              <MicOff size={24} color={palette.danger} />
+            )}
           </Pressable>
 
-          {/* 左摇杆 */}
+          {/* 左摇杆：前后左右移动（姿态模式下禁用；双腿站立模式走 two_leg 通道） */}
           <View
             style={[
               styles.leftJoystick,
@@ -402,13 +529,33 @@ export function RobotOperationScreen() {
             pointerEvents="box-none"
           >
             <JoystickPad
+              disabled={controlMode === 'pose' && !twoLegStandActive}
               onMove={({ x, y }) => {
+                if (controlMode === 'pose' && !twoLegStandActive) return;
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
+                const now = Date.now();
+                if (now - leftJoyThrottleRef.current < 50) return;
+                leftJoyThrottleRef.current = now;
+                directCtrl.sendJoystick(
+                  twoLegStandActive ? 'two_leg' : controlMode,
+                  'move',
+                  x,
+                  y,
+                  speed,
+                );
+              }}
+              onEnd={() => {
+                if (controlMode === 'pose' && !twoLegStandActive) return;
+                leftJoyThrottleRef.current = 0;
+                directCtrl.sendJoystickStop(
+                  twoLegStandActive ? 'two_leg' : controlMode,
+                  'move',
+                );
               }}
             />
           </View>
 
-          {/* 右摇杆 */}
+          {/* 右摇杆：姿态模式=姿态控制（pose 通道），移动模式=偏航旋转（look 通道）；双腿站立时禁用 */}
           <View
             style={[
               styles.rightJoystick,
@@ -417,32 +564,63 @@ export function RobotOperationScreen() {
             pointerEvents="box-none"
           >
             <JoystickPad
+              disabled={twoLegStandActive}
               onMove={({ x, y }) => {
+                if (twoLegStandActive) return;
                 if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) return;
+                const now = Date.now();
+                if (now - rightJoyThrottleRef.current < 50) return;
+                rightJoyThrottleRef.current = now;
+                const channel = controlMode === 'pose' ? 'pose' : 'look';
+                directCtrl.sendJoystick(controlMode, channel, x, y, speed);
+              }}
+              onEnd={() => {
+                if (twoLegStandActive) return;
+                rightJoyThrottleRef.current = 0;
+                const channel = controlMode === 'pose' ? 'pose' : 'look';
+                directCtrl.sendJoystickStop(controlMode, channel);
               }}
             />
           </View>
 
           {/* 动作按钮 */}
-          {ACTION_BUTTONS.map(item => (
-            <Pressable
-              key={item.id}
-              onPress={() => sendControl(item.label)}
-              style={[
-                styles.actionBtn,
-                {
-                  left: `${item.x}%` as any,
-                  top: `${item.y}%` as any,
-                  backgroundColor: palette.surface + '80',
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <Text style={[styles.actionBtnText, { color: palette.text }]}>
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
+          {ACTION_BUTTONS.map(item => {
+            const isActive = item.id === 'two_leg_stand' && twoLegStandActive;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => {
+                  if (item.id === 'two_leg_stand') {
+                    // 双腿站立：切换开关
+                    const next = !twoLegStandActive;
+                    setTwoLegStandActive(next);
+                    directCtrl.sendAction(
+                      next ? 'two_leg_stand' : 'cancel_two_leg_stand',
+                    );
+                    sendControl(next ? '进入双腿站立' : '退出双腿站立');
+                  } else {
+                    directCtrl.sendAction(item.id);
+                    sendControl(item.label);
+                  }
+                }}
+                style={[
+                  styles.actionBtn,
+                  {
+                    left: `${item.x}%` as any,
+                    top: `${item.y}%` as any,
+                    backgroundColor: isActive
+                      ? palette.primary + 'CC'
+                      : palette.surface + '80',
+                    borderColor: isActive ? palette.primary : palette.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.actionBtnText, { color: palette.text }]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
 
           {/* 弹幕状态层 */}
           <StatusDanmaku messages={danmakuMessages} onExpire={expireDanmaku} />
@@ -628,5 +806,12 @@ const styles = StyleSheet.create({
     color: '#DCE7FF',
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  // 直连状态指示小圆点
+  directDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

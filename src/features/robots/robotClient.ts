@@ -70,7 +70,7 @@ export class RobotClient {
     }
   }
 
-  // Volume
+  // Volume 音量
   async getVolume() {
     return this.request('/api/v1/volume');
   }
@@ -89,7 +89,7 @@ export class RobotClient {
     });
   }
 
-  // Config
+  // Config 配置
   async getConfig() {
     return this.request('/api/v1/config');
   }
@@ -101,7 +101,7 @@ export class RobotClient {
     });
   }
 
-  // WiFi
+  // WiFi 网络
   async scanWifi() {
     return this.request('/api/v1/wifi/scan');
   }
@@ -113,7 +113,7 @@ export class RobotClient {
     });
   }
 
-  // Logs
+  // Logs 日志
   async getLogs(appName?: string) {
     const query = appName ? `?app_name=${appName}` : '';
     return this.request(`/api/v1/logs${query}`);

@@ -112,7 +112,7 @@ export function SettingsScreen() {
         />
         <SettingsRow
           label="版本"
-          value="开发版"
+          value="0.1.0"
           showChevron={false}
           isLast
         />

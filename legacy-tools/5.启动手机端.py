@@ -12,8 +12,10 @@ from scripts.start.utils import (
     write_pid,
     kill_pid_file,
     确保node_modules存在,
+    检查端口是否被占用,
     检查运行环境,
     pkill_patterns,
+    kill_port,
 )
 
 ROBOT_PHONE = ROOT / "app" / "robot-phone" / "RobotPhone"
@@ -85,7 +87,9 @@ def start_metro() -> List[Tuple[str, int]]:
 
 
 def start_android() -> List[Tuple[str, int]]:
-    procs = start_metro()
+    # 不手动启动start_metro，让run android自动启动它
+    确保node_modules存在(ROBOT_PHONE)
+    procs: List[Tuple[str, int]] = []
     print("🚀 启动手机端 Android...")
     log_path = LOGS_DIR / "robot-phone" / "android.log"
     device_id = _pick_android_device()
@@ -117,6 +121,8 @@ def stop_robot_phone() -> bool:
     any_stopped |= kill_pid_file("robot-phone-ios")
     any_stopped |= kill_pid_file("robot-phone-metro")
     pkill_patterns(["react-native", "metro"])
+    if kill_port(8081):
+        any_stopped = True
     return any_stopped
 
 
@@ -176,6 +182,15 @@ def main() -> int:
         stop_robot_phone()
         time.sleep(2)
         action = _default_action()
+
+    if action in {"metro", "ios", "android"}:
+        if 检查端口是否被占用(8081):
+            print("⚠️  端口 8081 被占用，尝试清理...")
+            stop_robot_phone()
+            time.sleep(1)
+            if 检查端口是否被占用(8081):
+                print("⚠️  端口 8081 仍被占用，强制清理...")
+                kill_port(8081)
 
     if action == "metro":
         pids = start_metro()
