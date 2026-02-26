@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,18 +16,25 @@ type SectionProps = {
 
 export function Section({ title, children }: SectionProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      sectionHeader: { color: palette.textMuted },
+      sectionGroup: {
+        borderColor: palette.border,
+        backgroundColor: palette.surface,
+      },
+    }),
+    [palette],
+  );
   return (
     <View style={styles.section}>
       {title && (
-        <Text style={[styles.sectionHeader, { color: palette.textMuted }]}>
+        <Text style={[styles.sectionHeader, themedStyles.sectionHeader]}>
           {title}
         </Text>
       )}
       <View
-        style={[
-          styles.sectionGroup,
-          { borderColor: palette.border, backgroundColor: palette.surface },
-        ]}
+        style={[styles.sectionGroup, themedStyles.sectionGroup]}
       >
         {children}
       </View>
@@ -63,12 +70,20 @@ export function InputRow({
   keyboardType,
 }: InputRowProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      rowLabel: { color: palette.text },
+      rowInput: { color: palette.textMuted },
+      divider: { backgroundColor: palette.border },
+    }),
+    [palette],
+  );
   return (
     <>
       <View style={styles.row}>
-        <Text style={[styles.rowLabel, { color: palette.text }]}>{label}</Text>
+        <Text style={[styles.rowLabel, themedStyles.rowLabel]}>{label}</Text>
         <TextInput
-          style={[styles.rowInput, { color: palette.textMuted }]}
+          style={[styles.rowInput, themedStyles.rowInput]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -80,7 +95,7 @@ export function InputRow({
         />
       </View>
       {!isLast && (
-        <View style={[styles.divider, { backgroundColor: palette.border }]} />
+        <View style={[styles.divider, themedStyles.divider]} />
       )}
     </>
   );
@@ -106,26 +121,38 @@ export function ActionRow({
   subtitle,
 }: ActionRowProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      rowPressed: { backgroundColor: palette.surfaceAlt },
+      rowNormal: { backgroundColor: palette.surface },
+      rowLabelPrimary: { color: palette.primary },
+      rowLabelDanger: { color: palette.danger },
+      rowSubtitle: { color: palette.textMuted },
+      rowValue: { color: palette.textMuted },
+      divider: { backgroundColor: palette.border },
+    }),
+    [palette],
+  );
   return (
     <>
       <Pressable
         style={({ pressed }) => [
           styles.row,
-          { backgroundColor: pressed ? palette.surfaceAlt : palette.surface },
+          pressed ? themedStyles.rowPressed : themedStyles.rowNormal,
         ]}
         onPress={loading ? undefined : onPress}
       >
-        <View style={{ flex: 1 }}>
+        <View style={styles.rowValueWrap}>
           <Text
             style={[
               styles.rowLabel,
-              { color: danger ? palette.danger : palette.primary },
+              danger ? themedStyles.rowLabelDanger : themedStyles.rowLabelPrimary,
             ]}
           >
             {label}
           </Text>
           {subtitle && (
-            <Text style={[styles.rowSubtitle, { color: palette.textMuted }]}>
+            <Text style={[styles.rowSubtitle, themedStyles.rowSubtitle]}>
               {subtitle}
             </Text>
           )}
@@ -134,14 +161,14 @@ export function ActionRow({
           <ActivityIndicator size="small" color={palette.textMuted} />
         ) : (
           value && (
-            <Text style={[styles.rowValue, { color: palette.textMuted }]}>
+            <Text style={[styles.rowValue, themedStyles.rowValue]}>
               {value}
             </Text>
           )
         )}
       </Pressable>
       {!isLast && (
-        <View style={[styles.divider, { backgroundColor: palette.border }]} />
+        <View style={[styles.divider, themedStyles.divider]} />
       )}
     </>
   );
@@ -161,18 +188,26 @@ export function InfoRow({
   labelColor,
 }: InfoRowProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      rowLabel: { color: labelColor ?? palette.text },
+      rowValue: { color: palette.textMuted },
+      divider: { backgroundColor: palette.border },
+    }),
+    [labelColor, palette],
+  );
   return (
     <>
       <View style={styles.row}>
-        <Text style={[styles.rowLabel, { color: labelColor ?? palette.text }]}>
+        <Text style={[styles.rowLabel, themedStyles.rowLabel]}>
           {label}
         </Text>
-        <Text style={[styles.rowValue, { color: palette.textMuted }]}>
+        <Text style={[styles.rowValue, themedStyles.rowValue]}>
           {value}
         </Text>
       </View>
       {!isLast && (
-        <View style={[styles.divider, { backgroundColor: palette.border }]} />
+        <View style={[styles.divider, themedStyles.divider]} />
       )}
     </>
   );
@@ -205,6 +240,9 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 15,
     fontWeight: '500',
+    flex: 1,
+  },
+  rowValueWrap: {
     flex: 1,
   },
   rowSubtitle: {

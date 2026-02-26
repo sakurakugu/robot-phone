@@ -1,5 +1,5 @@
 import { useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Linking,
@@ -73,15 +73,25 @@ function PickerModal({
   onClose,
 }: PickerModalProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      sheet: { backgroundColor: palette.surface },
+      title: { color: palette.text },
+      itemBorder: { borderBottomColor: palette.border },
+      itemSelected: { backgroundColor: palette.surfaceAlt },
+      itemText: { color: palette.text },
+      itemTextSelected: { color: palette.primary },
+      check: { color: palette.primary },
+      cancel: { backgroundColor: palette.surfaceAlt },
+      cancelText: { color: palette.text },
+    }),
+    [palette],
+  );
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View
-        style={[pickerStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-      >
-        <View
-          style={[pickerStyles.sheet, { backgroundColor: palette.surface }]}
-        >
-          <Text style={[pickerStyles.title, { color: palette.text }]}>
+      <View style={pickerStyles.overlay}>
+        <View style={[pickerStyles.sheet, themedStyles.sheet]}>
+          <Text style={[pickerStyles.title, themedStyles.title]}>
             {title}
           </Text>
           <FlatList
@@ -91,8 +101,8 @@ function PickerModal({
               <Pressable
                 style={[
                   pickerStyles.item,
-                  { borderBottomColor: palette.border },
-                  item === selected && { backgroundColor: palette.surfaceAlt },
+                  themedStyles.itemBorder,
+                  item === selected && themedStyles.itemSelected,
                 ]}
                 onPress={() => {
                   onSelect(item);
@@ -100,26 +110,25 @@ function PickerModal({
                 }}
               >
                 <Text
-                  style={{
-                    color: item === selected ? palette.primary : palette.text,
-                  }}
+                  style={[
+                    item === selected
+                      ? themedStyles.itemTextSelected
+                      : themedStyles.itemText,
+                  ]}
                 >
                   {item || '全部应用'}
                 </Text>
                 {item === selected && (
-                  <Text style={{ color: palette.primary }}>✓</Text>
+                  <Text style={themedStyles.check}>✓</Text>
                 )}
               </Pressable>
             )}
           />
           <Pressable
-            style={[
-              pickerStyles.cancel,
-              { backgroundColor: palette.surfaceAlt },
-            ]}
+            style={[pickerStyles.cancel, themedStyles.cancel]}
             onPress={onClose}
           >
-            <Text style={{ color: palette.text }}>取消</Text>
+            <Text style={themedStyles.cancelText}>取消</Text>
           </Pressable>
         </View>
       </View>
@@ -141,24 +150,28 @@ function TimePickerModal({
   onClose,
 }: TimePickerModalProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      sheet: { backgroundColor: palette.surface },
+      title: { color: palette.text },
+      hint: { color: palette.textMuted },
+      itemBorder: { borderBottomColor: palette.border },
+      itemText: { color: palette.text },
+      itemSubText: { color: palette.textMuted },
+      cancel: { backgroundColor: palette.surfaceAlt },
+      cancelText: { color: palette.text },
+    }),
+    [palette],
+  );
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View
-        style={[pickerStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-      >
-        <View
-          style={[pickerStyles.sheet, { backgroundColor: palette.surface }]}
-        >
-          <Text style={[pickerStyles.title, { color: palette.text }]}>
+      <View style={pickerStyles.overlay}>
+        <View style={[pickerStyles.sheet, themedStyles.sheet]}>
+          <Text style={[pickerStyles.title, themedStyles.title]}>
             {title}
           </Text>
           <Text
-            style={{
-              color: palette.textMuted,
-              marginHorizontal: 16,
-              marginBottom: 8,
-              fontSize: 12,
-            }}
+            style={[pickerStyles.hint, themedStyles.hint]}
           >
             以当前时间为基准快速选择开始时间
           </Text>
@@ -170,28 +183,25 @@ function TimePickerModal({
                 key={p.hours}
                 style={[
                   pickerStyles.item,
-                  { borderBottomColor: palette.border },
+                  themedStyles.itemBorder,
                 ]}
                 onPress={() => {
                   onSelect(iso);
                   onClose();
                 }}
               >
-                <Text style={{ color: palette.text }}>{p.label}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                <Text style={themedStyles.itemText}>{p.label}</Text>
+                <Text style={[pickerStyles.itemSubText, themedStyles.itemSubText]}>
                   {formatDisplayTime(iso)}
                 </Text>
               </Pressable>
             );
           })}
           <Pressable
-            style={[
-              pickerStyles.cancel,
-              { backgroundColor: palette.surfaceAlt },
-            ]}
+            style={[pickerStyles.cancel, themedStyles.cancel]}
             onPress={onClose}
           >
-            <Text style={{ color: palette.text }}>取消</Text>
+            <Text style={themedStyles.cancelText}>取消</Text>
           </Pressable>
         </View>
       </View>
@@ -200,7 +210,11 @@ function TimePickerModal({
 }
 
 const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   sheet: {
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
@@ -221,6 +235,14 @@ const pickerStyles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  hint: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    fontSize: 12,
+  },
+  itemSubText: {
+    fontSize: 12,
+  },
   cancel: { margin: 16, padding: 12, borderRadius: 10, alignItems: 'center' },
 });
 
@@ -229,6 +251,14 @@ export function RobotLogScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
   const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const themedStyles = useMemo(
+    () => ({
+      message: { color: palette.warning },
+      text: { color: palette.text },
+      textMuted: { color: palette.textMuted },
+    }),
+    [palette],
+  );
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -309,7 +339,7 @@ export function RobotLogScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
-          <Text style={[styles.message, { color: palette.warning }]}>
+          <Text style={[styles.message, themedStyles.message]}>
             {message}
           </Text>
         ) : null}
@@ -331,11 +361,13 @@ export function RobotLogScreen() {
             </Text>
             <View style={styles.selectorRight}>
               <Text
-                style={{ color: appName ? palette.text : palette.textMuted }}
+                style={appName ? themedStyles.text : themedStyles.textMuted}
               >
                 {appName || '全部应用'}
               </Text>
-              <Text style={{ color: palette.textMuted, marginLeft: 4 }}>›</Text>
+              <Text style={[styles.selectorArrow, themedStyles.textMuted]}>
+                ›
+              </Text>
             </View>
           </Pressable>
 
@@ -355,11 +387,13 @@ export function RobotLogScreen() {
             </Text>
             <View style={styles.selectorRight}>
               <Text
-                style={{ color: startTime ? palette.text : palette.textMuted }}
+                style={startTime ? themedStyles.text : themedStyles.textMuted}
               >
                 {startTime ? formatDisplayTime(startTime) : '点击选择'}
               </Text>
-              <Text style={{ color: palette.textMuted, marginLeft: 4 }}>›</Text>
+              <Text style={[styles.selectorArrow, themedStyles.textMuted]}>
+                ›
+              </Text>
             </View>
           </Pressable>
 
@@ -373,11 +407,13 @@ export function RobotLogScreen() {
             </Text>
             <View style={styles.selectorRight}>
               <Text
-                style={{ color: endTime ? palette.text : palette.textMuted }}
+                style={endTime ? themedStyles.text : themedStyles.textMuted}
               >
                 {endTime ? formatDisplayTime(endTime) : '点击选择'}
               </Text>
-              <Text style={{ color: palette.textMuted, marginLeft: 4 }}>›</Text>
+              <Text style={[styles.selectorArrow, themedStyles.textMuted]}>
+                ›
+              </Text>
             </View>
           </Pressable>
         </Section>
@@ -477,5 +513,8 @@ const styles = StyleSheet.create({
   selectorRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  selectorArrow: {
+    marginLeft: 4,
   },
 });

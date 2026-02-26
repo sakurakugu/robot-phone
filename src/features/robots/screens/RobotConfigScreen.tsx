@@ -1,5 +1,5 @@
 import { useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -68,13 +68,25 @@ function SelectModal({
   onClose,
 }: SelectModalProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      sheet: { backgroundColor: palette.surface },
+      title: { color: palette.text },
+      itemBorder: { borderBottomColor: palette.border },
+      itemSelected: { backgroundColor: palette.surfaceAlt },
+      itemText: { color: palette.text },
+      itemTextSelected: { color: palette.primary },
+      check: { color: palette.primary },
+      cancel: { backgroundColor: palette.surfaceAlt },
+      cancelText: { color: palette.text },
+    }),
+    [palette],
+  );
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View
-        style={[modalStyles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-      >
-        <View style={[modalStyles.sheet, { backgroundColor: palette.surface }]}>
-          <Text style={[modalStyles.title, { color: palette.text }]}>
+      <View style={modalStyles.overlay}>
+        <View style={[modalStyles.sheet, themedStyles.sheet]}>
+          <Text style={[modalStyles.title, themedStyles.title]}>
             {title}
           </Text>
           <FlatList
@@ -84,8 +96,8 @@ function SelectModal({
               <Pressable
                 style={[
                   modalStyles.item,
-                  { borderBottomColor: palette.border },
-                  item === selected && { backgroundColor: palette.surfaceAlt },
+                  themedStyles.itemBorder,
+                  item === selected && themedStyles.itemSelected,
                 ]}
                 onPress={() => {
                   onSelect(item);
@@ -93,26 +105,25 @@ function SelectModal({
                 }}
               >
                 <Text
-                  style={{
-                    color: item === selected ? palette.primary : palette.text,
-                  }}
+                  style={[
+                    item === selected
+                      ? themedStyles.itemTextSelected
+                      : themedStyles.itemText,
+                  ]}
                 >
                   {item}
                 </Text>
                 {item === selected && (
-                  <Text style={{ color: palette.primary }}>✓</Text>
+                  <Text style={themedStyles.check}>✓</Text>
                 )}
               </Pressable>
             )}
           />
           <Pressable
-            style={[
-              modalStyles.cancel,
-              { backgroundColor: palette.surfaceAlt },
-            ]}
+            style={[modalStyles.cancel, themedStyles.cancel]}
             onPress={onClose}
           >
-            <Text style={{ color: palette.text }}>取消</Text>
+            <Text style={themedStyles.cancelText}>取消</Text>
           </Pressable>
         </View>
       </View>
@@ -120,7 +131,11 @@ function SelectModal({
   );
 }
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   sheet: {
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
@@ -148,6 +163,15 @@ export function RobotConfigScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
   const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const themedStyles = useMemo(
+    () => ({
+      message: { color: palette.warning },
+      boolLabel: { color: palette.text },
+      selectValue: { color: palette.textMuted },
+      selectArrow: { color: palette.textMuted, marginLeft: 4 },
+    }),
+    [palette],
+  );
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -228,7 +252,7 @@ export function RobotConfigScreen() {
           if (!field || field.readonly) continue;
           const rawVal = sectionData[key];
           let val: any = rawVal;
-          if (field.type === 'int') val = parseInt(String(rawVal)) || 0;
+          if (field.type === 'int') val = parseInt(String(rawVal), 10) || 0;
           else if (field.type === 'float')
             val = parseFloat(String(rawVal)) || 0;
           else if (field.type === 'bool') val = Boolean(rawVal);
@@ -265,7 +289,7 @@ export function RobotConfigScreen() {
     await withLoading(async () => {
       const res = await client.updateSdkConfig(
         sdkTargetIp,
-        parseInt(sdkTargetPort),
+        parseInt(sdkTargetPort, 10),
       );
       if (res.success) setMessage('SDK配置已更新');
     });
@@ -334,7 +358,7 @@ export function RobotConfigScreen() {
       return (
         <React.Fragment key={field.full_key}>
           <View style={cfgStyles.boolRow}>
-            <Text style={[cfgStyles.boolLabel, { color: palette.text }]}>
+            <Text style={[cfgStyles.boolLabel, themedStyles.boolLabel]}>
               {field.description}
             </Text>
             <Switch
@@ -362,9 +386,9 @@ export function RobotConfigScreen() {
             <Text style={[cfgStyles.boolLabel, { color: palette.text }]}>
               {field.description}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ color: palette.textMuted }}>{String(value)}</Text>
-              <Text style={{ color: palette.textMuted, marginLeft: 4 }}>›</Text>
+            <View style={cfgStyles.selectValueRow}>
+              <Text style={themedStyles.selectValue}>{String(value)}</Text>
+              <Text style={themedStyles.selectArrow}>›</Text>
             </View>
           </Pressable>
           {!isLast && (
@@ -411,7 +435,7 @@ export function RobotConfigScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
-          <Text style={[styles.message, { color: palette.warning }]}>
+          <Text style={[styles.message, themedStyles.message]}>
             {message}
           </Text>
         ) : null}
@@ -538,6 +562,10 @@ const cfgStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     minHeight: 48,
+  },
+  selectValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   divider: {
     height: StyleSheet.hairlineWidth,

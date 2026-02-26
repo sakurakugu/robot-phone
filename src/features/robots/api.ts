@@ -1,5 +1,5 @@
 import { http } from '../../shared/net/http';
-import type { Robot, RobotForm } from './types';
+import type { DiscoveredRobot, Robot, RobotForm } from './types';
 
 export async function fetchRobots(): Promise<Robot[]> {
   const data = await http.get<{ robots: Robot[] }>('/robots');
@@ -49,4 +49,9 @@ export function getRobotConfig(uuid: string): Promise<any> {
 
 export function updateRobotConfig(uuid: string, config: any): Promise<any> {
   return http.post<any>(`/robots/${uuid}/config`, config);
+}
+
+export async function discoverRobots(timeoutSec = 3): Promise<DiscoveredRobot[]> {
+  const data = await http.get<{ robots: DiscoveredRobot[] }>(`/robots/discover?timeout=${timeoutSec}`);
+  return data.robots ?? [];
 }

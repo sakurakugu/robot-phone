@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 
@@ -19,6 +19,21 @@ export function ToggleSwitch({
   disabled = false,
 }: ToggleSwitchProps) {
   const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      activeTrack: { backgroundColor: palette.primary },
+      inactiveTrack: {
+        backgroundColor: palette.surfaceAlt,
+        borderWidth: 1,
+        borderColor: palette.border,
+      },
+      disabledTrack: { opacity: 0.45 },
+      thumb: { backgroundColor: palette.surface },
+      labelActive: { color: '#FFFFFF' },
+      labelInactive: { color: palette.textMuted },
+    }),
+    [palette],
+  );
 
   return (
     <Pressable
@@ -26,23 +41,22 @@ export function ToggleSwitch({
       disabled={disabled}
       style={[
         styles.toggleSwitch,
-        { backgroundColor: value ? palette.primary : palette.surfaceAlt },
-        value ? null : { borderWidth: 1, borderColor: palette.border },
-        disabled ? { opacity: 0.45 } : null,
+        value ? themedStyles.activeTrack : themedStyles.inactiveTrack,
+        disabled ? themedStyles.disabledTrack : null,
       ]}
     >
       <View
         style={[
           styles.toggleThumb,
           value ? styles.toggleThumbRight : styles.toggleThumbLeft,
-          { backgroundColor: palette.surface },
+          themedStyles.thumb,
         ]}
       />
       <Text
         style={[
           styles.toggleLabel,
           value ? styles.toggleLabelLeft : styles.toggleLabelRight,
-          { color: value ? '#FFFFFF' : palette.textMuted },
+          value ? themedStyles.labelActive : themedStyles.labelInactive,
         ]}
       >
         {value ? activeText : inactiveText}

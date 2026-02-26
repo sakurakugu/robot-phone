@@ -1,8 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { usePalette } from '../../../app/theme/palette';
-import { Screen } from '../../../shared/ui/Screen';
+import { usePalette } from '../../../../app/theme/palette';
+import { Screen } from '../../../../shared/ui/Screen';
 
 const groupControls = [
   {

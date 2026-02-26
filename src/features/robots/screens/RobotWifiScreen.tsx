@@ -1,5 +1,5 @@
 import { useRoute } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -24,6 +24,19 @@ export function RobotWifiScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
   const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const themedStyles = useMemo(
+    () => ({
+      message: { color: palette.warning },
+      modalOverlay: { backgroundColor: 'rgba(0,0,0,0.5)' },
+      modalContent: { backgroundColor: palette.surface },
+      modalTitle: { color: palette.text },
+      modalItemText: { color: palette.text },
+      modalSignalText: { color: palette.textMuted },
+      modalClose: { backgroundColor: palette.surfaceAlt },
+      modalCloseText: { color: palette.text },
+    }),
+    [palette],
+  );
 
   const [scanLoading, setScanLoading] = useState(false);
   const [connectLoading, setConnectLoading] = useState(false);
@@ -89,7 +102,7 @@ export function RobotWifiScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
-          <Text style={[styles.message, { color: palette.warning }]}>
+          <Text style={[styles.message, themedStyles.message]}>
             {message}
           </Text>
         ) : null}
@@ -126,13 +139,9 @@ export function RobotWifiScreen() {
 
       {/* WiFi 列表弹窗 */}
       <Modal visible={showWifiList} animationType="slide" transparent>
-        <View
-          style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-        >
-          <View
-            style={[styles.modalContent, { backgroundColor: palette.surface }]}
-          >
-            <Text style={[styles.modalTitle, { color: palette.text }]}>
+        <View style={[styles.modalOverlay, themedStyles.modalOverlay]}>
+          <View style={[styles.modalContent, themedStyles.modalContent]}>
+            <Text style={[styles.modalTitle, themedStyles.modalTitle]}>
               WiFi 列表
             </Text>
             <FlatList
@@ -146,11 +155,11 @@ export function RobotWifiScreen() {
                     setShowWifiList(false);
                   }}
                 >
-                  <Text style={{ color: palette.text }}>
+                  <Text style={themedStyles.modalItemText}>
                     {item.ssid || item} {item.in_use ? '(已连接)' : ''}
                   </Text>
                   {item.signal && (
-                    <Text style={{ color: palette.textMuted, fontSize: 12 }}>
+                    <Text style={[styles.modalSignal, themedStyles.modalSignalText]}>
                       信号: {item.signal}%
                     </Text>
                   )}
@@ -158,13 +167,10 @@ export function RobotWifiScreen() {
               )}
             />
             <Pressable
-              style={[
-                styles.modalClose,
-                { backgroundColor: palette.surfaceAlt },
-              ]}
+              style={[styles.modalClose, themedStyles.modalClose]}
               onPress={() => setShowWifiList(false)}
             >
-              <Text style={{ color: palette.text }}>关闭</Text>
+              <Text style={themedStyles.modalCloseText}>关闭</Text>
             </Pressable>
           </View>
         </View>
@@ -203,6 +209,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ccc',
+  },
+  modalSignal: {
+    fontSize: 12,
   },
   modalClose: {
     marginTop: 16,

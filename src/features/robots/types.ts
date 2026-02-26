@@ -32,3 +32,12 @@ export type RobotForm = {
   tags?: string[];
   role_uuid?: string | null;
 };
+
+export type DiscoveredRobot = {
+  uuid: string;
+  name: string;
+  model: string;
+  version: string;
+  ip: string;
+  port: number;
+};

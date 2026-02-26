@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -11,15 +11,9 @@ import {
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import {
-  createRobot,
-  deleteRobot,
-  fetchRobotGroups,
-  fetchRobots,
-} from '../api';
+import { deleteRobot, fetchRobotGroups, fetchRobots } from '../api';
 import { RobotCard } from '../components/RobotCard';
-import { RobotFormModal } from '../components/RobotFormModal';
-import type { Robot, RobotForm } from '../types';
+import type { Robot } from '../types';
 
 const groupControlItems = [
   { id: 'gc1', title: '群控', desc: '进入群控中心', route: '群控' },
@@ -33,7 +27,6 @@ export function RobotManagementScreen() {
   const [groups, setGroups] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
-  const [createVisible, setCreateVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -52,14 +45,11 @@ export function RobotManagementScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  async function handleCreate(payload: RobotForm) {
-    await createRobot(payload);
-    await loadData();
-  }
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   async function handleDelete(uuid: string) {
     await deleteRobot(uuid);
@@ -92,7 +82,7 @@ export function RobotManagementScreen() {
       <View style={styles.actions}>
         <Pressable
           style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
-          onPress={() => setCreateVisible(true)}
+          onPress={() => navigation.navigate('新增机器人')}
         >
           <Text style={styles.primaryBtnText}>新增机器人</Text>
         </Pressable>
@@ -159,13 +149,6 @@ export function RobotManagementScreen() {
             onDelete={() => handleDelete(item.uuid)}
           />
         )}
-      />
-
-      <RobotFormModal
-        visible={createVisible}
-        mode="create"
-        onClose={() => setCreateVisible(false)}
-        onSubmit={handleCreate}
       />
     </Screen>
   );
