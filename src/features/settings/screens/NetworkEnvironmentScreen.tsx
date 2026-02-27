@@ -8,6 +8,7 @@ import {
     Text,
     View,
 } from 'react-native';
+import DeviceInfo from "react-native-device-info";
 import { usePalette } from '../../../app/theme/palette';
 import {
     getActiveEnvironment,
@@ -21,6 +22,7 @@ export function NetworkEnvironmentScreen() {
   const navigation = useNavigation<any>();
   const [environments, setEnvironments] = useState(listEnvironments());
   const [activeId, setActiveId] = useState(getActiveEnvironment().id);
+  const [ipAddress, setIpAddress] = useState('');
   const themedStyles = useMemo(
     () => ({
       container: { flex: 1, backgroundColor: palette.background },
@@ -54,7 +56,21 @@ export function NetworkEnvironmentScreen() {
     setActiveId(getActiveEnvironment().id);
   }, []);
 
-  useFocusEffect(reload);
+  const loadIp = useCallback(async () => {
+    try {
+      const ip = await DeviceInfo.getIpAddress();
+      setIpAddress(String(ip || '').trim() || '未知');
+    } catch {
+      setIpAddress('无法获取');
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+      loadIp();
+    }, [reload, loadIp]),
+  );
 
   function activate(id: string) {
     setActiveEnvironment(id);
@@ -93,6 +109,14 @@ export function NetworkEnvironmentScreen() {
                 <Pressable
                   style={styles.envMain}
                   onPress={() => activate(env.id)}
+                  onLongPress={() =>
+                    navigation.navigate('添加配置环境', {
+                      mode: 'edit',
+                      envId: env.id,
+                      name: env.name,
+                      baseUrl: env.baseUrl,
+                    })
+                  }
                 >
                   <View style={styles.envTextGroup}>
                     <View style={styles.envNameRow}>
@@ -149,6 +173,10 @@ export function NetworkEnvironmentScreen() {
           );
         })}
       </View>
+
+      <Text style={[styles.tip, themedStyles.tip]}>
+        当前 IP：{ipAddress || '未知'}
+      </Text>
 
       <Text style={[styles.sectionHeader, themedStyles.sectionHeader]}>
         操作

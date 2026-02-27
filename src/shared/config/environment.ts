@@ -20,6 +20,17 @@ const DEFAULT_ENVIRONMENTS: AppEnvironment[] = [
 let environments: AppEnvironment[] = [...DEFAULT_ENVIRONMENTS];
 let activeEnvironmentId = 'local';
 
+function isDefaultEnvironment(id: string): boolean {
+  return DEFAULT_ENVIRONMENTS.some(env => env.id === id);
+}
+
+function applyCustomEnvironments(custom: AppEnvironment[]): void {
+  const customMap = new Map(custom.map(item => [item.id, item]));
+  const mergedDefaults = DEFAULT_ENVIRONMENTS.map(item => customMap.get(item.id) || item);
+  const customOnly = custom.filter(item => !isDefaultEnvironment(item.id));
+  environments = [...mergedDefaults, ...customOnly];
+}
+
 /** 应用启动时调用，从 AsyncStorage 加载持久化的自定义环境 */
 export async function initEnvironments(): Promise<void> {
   try {
@@ -29,7 +40,7 @@ export async function initEnvironments(): Promise<void> {
     ]);
     if (rawEnvs) {
       const custom: AppEnvironment[] = JSON.parse(rawEnvs);
-      environments = [...DEFAULT_ENVIRONMENTS, ...custom];
+      applyCustomEnvironments(custom);
     }
     if (rawActiveId) {
       const exists = environments.some(e => e.id === rawActiveId);
@@ -43,7 +54,13 @@ export async function initEnvironments(): Promise<void> {
 }
 
 function saveCustomEnvironments(): void {
-  const custom = environments.filter(e => !DEFAULT_ENVIRONMENTS.find(d => d.id === e.id));
+  const custom = environments.filter(env => {
+    const defaultEnv = DEFAULT_ENVIRONMENTS.find(item => item.id === env.id);
+    if (!defaultEnv) {
+      return true;
+    }
+    return defaultEnv.name !== env.name || defaultEnv.baseUrl !== env.baseUrl;
+  });
   AsyncStorage.setItem(STORAGE_KEY_CUSTOM, JSON.stringify(custom)).catch(() => {});
 }
 
@@ -79,7 +96,7 @@ export function addEnvironment(name: string, baseUrl: string): AppEnvironment {
 }
 
 export function removeEnvironment(id: string): void {
-  if (DEFAULT_ENVIRONMENTS.find(e => e.id === id)) {
+  if (isDefaultEnvironment(id)) {
     return; // 不允许删除默认环境
   }
   environments = environments.filter(e => e.id !== id);
@@ -88,6 +105,29 @@ export function removeEnvironment(id: string): void {
     saveActiveId();
   }
   saveCustomEnvironments();
+}
+
+export function updateEnvironment(
+  id: string,
+  name: string,
+  baseUrl: string,
+): AppEnvironment | null {
+  const index = environments.findIndex(item => item.id === id);
+  if (index < 0) {
+    return null;
+  }
+  const updated: AppEnvironment = {
+    ...environments[index],
+    name,
+    baseUrl: baseUrl.replace(/\/$/, ''),
+  };
+  environments = [
+    ...environments.slice(0, index),
+    updated,
+    ...environments.slice(index + 1),
+  ];
+  saveCustomEnvironments();
+  return updated;
 }
 
 export function getApiBaseUrl(): string {

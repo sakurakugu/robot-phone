@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -9,17 +10,15 @@ import {
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { createRole, deleteRole, fetchRoleRobots, fetchRoles, updateRole } from '../api';
-import { RoleFormModal } from '../components/RoleFormModal';
-import type { Role, RoleForm } from '../types';
+import { deleteRole, fetchRoleRobots, fetchRoles } from '../api';
+import type { Role } from '../types';
 
 export function RoleManagementScreen() {
   const palette = usePalette();
+  const navigation = useNavigation<any>();
   const [roles, setRoles] = useState<Role[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [createVisible, setCreateVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [roleUsage, setRoleUsage] = useState<Record<string, number>>({});
 
   const loadData = useCallback(async () => {
@@ -43,20 +42,11 @@ export function RoleManagementScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  async function handleCreate(payload: RoleForm) {
-    await createRole(payload);
-    await loadData();
-  }
-
-  async function handleEdit(payload: RoleForm) {
-    if (!editingRole) return;
-    await updateRole(editingRole.uuid, payload);
-    await loadData();
-  }
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   async function handleDelete(uuid: string) {
     await deleteRole(uuid);
@@ -72,7 +62,7 @@ export function RoleManagementScreen() {
       <View style={styles.actions}>
         <Pressable
           style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
-          onPress={() => setCreateVisible(true)}
+          onPress={() => navigation.navigate('新增角色')}
         >
           <Text style={styles.primaryBtnText}>新增角色</Text>
         </Pressable>
@@ -108,7 +98,9 @@ export function RoleManagementScreen() {
             </Text>
             <View style={styles.row}>
               <Pressable
-                onPress={() => setEditingRole(item)}
+                onPress={() =>
+                  navigation.navigate('编辑角色', { mode: 'edit', role: item })
+                }
                 style={[styles.actionBtn, { borderColor: palette.border }]}
               >
                 <Text style={{ color: palette.text }}>编辑</Text>
@@ -124,19 +116,6 @@ export function RoleManagementScreen() {
         )}
       />
 
-      <RoleFormModal
-        visible={createVisible}
-        mode="create"
-        onClose={() => setCreateVisible(false)}
-        onSubmit={handleCreate}
-      />
-      <RoleFormModal
-        visible={!!editingRole}
-        mode="edit"
-        initialValue={editingRole}
-        onClose={() => setEditingRole(null)}
-        onSubmit={handleEdit}
-      />
     </Screen>
   );
 }

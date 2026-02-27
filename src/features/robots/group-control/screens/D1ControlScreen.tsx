@@ -24,6 +24,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppPreferences } from '../../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../../app/theme/palette';
 import { fetchRobots } from '../../api';
 import { JoystickPad } from '../../components/JoystickPad';
@@ -83,12 +84,19 @@ function LabeledJoystick({
   onEnd,
   disabled,
   palette,
+  colors,
 }: {
   label: string;
   onMove: (x: number, y: number) => void;
   onEnd: () => void;
   disabled?: boolean;
   palette: ReturnType<typeof usePalette>;
+  colors?: {
+    outer?: string;
+    outerBorder?: string;
+    stick?: string;
+    stickBorder?: string;
+  };
 }) {
   return (
     <View style={styles.joystickContainer}>
@@ -96,12 +104,7 @@ function LabeledJoystick({
         onMove={p => onMove(p.x, p.y)}
         onEnd={onEnd}
         disabled={disabled}
-        colors={{
-          outer: 'rgba(0,0,0,0.28)',
-          outerBorder: 'rgba(0,0,0,0.55)',
-          stick: 'rgba(0,0,0,0.55)',
-          stickBorder: 'rgba(0,0,0,0.7)',
-        }}
+        colors={colors}
       />
       <Text style={[styles.joystickLabel, { color: palette.textMuted }]}>
         {label}
@@ -114,6 +117,8 @@ function LabeledJoystick({
 export function D1ControlScreen() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
+  const { activeThemeMode } = useAppPreferences();
+  const isDark = activeThemeMode === 'dark';
 
   // ── 服务器机器狗列表 ──────────────────────────────────────────────────────
   const [robots, setRobots] = useState<Robot[]>([]);
@@ -170,6 +175,19 @@ export function D1ControlScreen() {
   }, [robots, selectedUuids]);
 
   const ctrl = useD1GroupControl(selectedIps);
+
+  const joystickColors = useMemo(
+    () =>
+      isDark
+        ? undefined
+        : {
+            outer: 'rgba(44,105,255,0.18)',
+            outerBorder: 'rgba(44,105,255,0.6)',
+            stick: 'rgba(44,105,255,0.6)',
+            stickBorder: 'rgba(44,105,255,0.8)',
+          },
+    [isDark],
+  );
 
   // ── 控制模式 ─────────────────────────────────────────────────────────────
   const [controlMode, setControlMode] = useState<D1ControlMode>('move');
@@ -437,12 +455,14 @@ export function D1ControlScreen() {
           palette={palette}
           onMove={handleLeftJoystick}
           onEnd={handleLeftEnd}
+          colors={joystickColors}
         />
         <LabeledJoystick
           label={controlMode === 'pose' ? '姿态' : '转向'}
           palette={palette}
           onMove={handleRightJoystick}
           onEnd={handleRightEnd}
+          colors={joystickColors}
         />
       </View>
     </View>

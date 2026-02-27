@@ -7,6 +7,7 @@ import { X2LingChuangScreen } from '../../features/robots/group-control/screens/
 import { X2NormalScreen } from '../../features/robots/group-control/screens/X2NormalScreen';
 import { X2TaiCiScreen } from '../../features/robots/group-control/screens/X2TaiCiScreen';
 import { X2TejiScreen } from '../../features/robots/group-control/screens/X2TejiScreen';
+import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
 import { AddRobotScreen } from '../../features/robots/screens/AddRobotScreen';
 import { RobotChatScreen } from '../../features/robots/screens/RobotChatScreen';
 import { RobotConfigScreen } from '../../features/robots/screens/RobotConfigScreen';
@@ -50,6 +51,8 @@ export function RootStack() {
       />
       <Stack.Screen name="机器人设置" component={RobotSettingsScreen} />
       <Stack.Screen name="新增机器人" component={AddRobotScreen} />
+      <Stack.Screen name="新增角色" component={RoleFormScreen} />
+      <Stack.Screen name="编辑角色" component={RoleFormScreen} />
       <Stack.Screen name="WiFi设置" component={RobotWifiScreen} />
       <Stack.Screen name="日志管理" component={RobotLogScreen} />
       <Stack.Screen name="高级配置" component={RobotConfigScreen} />

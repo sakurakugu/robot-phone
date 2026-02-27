@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Smartphone } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   FlatList,
@@ -73,9 +74,20 @@ export function RobotManagementScreen() {
             )
           }
         >
-          <Text style={[styles.rotateBtnText, { color: palette.text }]}>
-            {homeOrientation === 'portrait' ? '切横屏' : '切竖屏'}
-          </Text>
+          <View
+            style={{
+              transform: [
+                {
+                  rotate:
+                    homeOrientation === 'portrait'
+                      ? '0deg'
+                      : '90deg',
+                },
+              ],
+            }}
+          >
+            <Smartphone size={16} color={palette.text} />
+          </View>
         </Pressable>
       }
     >
@@ -164,10 +176,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-  },
-  rotateBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   primaryBtn: {
     borderRadius: 10,

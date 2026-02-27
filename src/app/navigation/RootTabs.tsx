@@ -1,6 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import {
+  Bot,
+  Compass,
+  User,
+  Users,
+} from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { DiscoverScreen } from '../../features/discover/screens/DiscoverScreen';
 import { ProfileScreen } from '../../features/profile/screens/ProfileScreen';
 import { RobotManagementScreen } from '../../features/robots/screens/RobotManagementScreen';
@@ -11,33 +17,40 @@ type TabName = '机器人' | '角色' | '发现' | '我的';
 
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+type TabIconProps = {
+  name: TabName;
+  focused: boolean;
+};
+
+const iconMap: Record<TabName, React.ComponentType<{ color: string; size?: number }>> = {
+  机器人: Bot,
+  角色: Users,
+  发现: Compass,
+  我的: User,
+};
+
+function TabIcon({ name, focused }: TabIconProps) {
   const palette = usePalette();
   const themedStyles = useMemo(
     () => ({
-      icon: {
-        backgroundColor: focused ? palette.primary : palette.surfaceAlt,
-        borderColor: focused ? palette.primary : palette.border,
-      },
-      text: {
-        color: focused ? '#FFFFFF' : palette.textMuted,
-      },
+      iconColor: focused ? palette.primary : palette.textMuted,
     }),
     [focused, palette],
   );
 
+  const Icon = iconMap[name];
   return (
-    <View style={[styles.icon, themedStyles.icon]}>
-      <Text style={[styles.iconText, themedStyles.text]}>{label}</Text>
+    <View style={styles.icon}>
+      <Icon color={themedStyles.iconColor} size={22} />
     </View>
   );
 }
 
-const symbolMap: Record<TabName, string> = {
-  机器人: '机',
-  角色: '角',
-  发现: '发',
-  我的: '我',
+const tabBarIconMap: Record<TabName, ({ focused }: { focused: boolean }) => React.JSX.Element> = {
+  机器人: ({ focused }) => <TabIcon name="机器人" focused={focused} />,
+  角色: ({ focused }) => <TabIcon name="角色" focused={focused} />,
+  发现: ({ focused }) => <TabIcon name="发现" focused={focused} />,
+  我的: ({ focused }) => <TabIcon name="我的" focused={focused} />,
 };
 
 export function RootTabs() {
@@ -60,13 +73,7 @@ export function RootTabs() {
         tabBarInactiveTintColor: palette.textMuted,
         tabBarStyle: [styles.tabBar, themedStyles.tabBar],
         tabBarLabelStyle: styles.tabBarLabel,
-
-        tabBarIcon: ({ focused }) => (
-          <TabIcon
-            label={symbolMap[route.name as TabName] || '·'}
-            focused={focused}
-          />
-        ),
+        tabBarIcon: tabBarIconMap[route.name as TabName],
       })}
     >
       <Tab.Screen name="机器人" component={RobotManagementScreen} />
@@ -79,16 +86,8 @@ export function RootTabs() {
 
 const styles = StyleSheet.create({
   icon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-  },
-  iconText: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   tabBar: {
     height: 64,

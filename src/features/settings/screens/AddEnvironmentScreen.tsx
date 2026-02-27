@@ -1,19 +1,42 @@
-import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import {
   addEnvironment,
   setActiveEnvironment,
+  updateEnvironment,
 } from '../../../shared/config/environment';
 import { Screen } from '../../../shared/ui/Screen';
+
+type RouteParams = {
+  mode?: 'edit';
+  envId?: string;
+  name?: string;
+  baseUrl?: string;
+};
 
 export function AddEnvironmentScreen() {
   const palette = usePalette();
   const navigation = useNavigation<any>();
-  const [name, setName] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
+  const route = useRoute<any>();
+  const params: RouteParams = route.params ?? {};
+  const isEdit = params.mode === 'edit' && !!params.envId;
+  const [name, setName] = useState(params.name ?? '');
+  const [baseUrl, setBaseUrl] = useState(params.baseUrl ?? '');
   const [error, setError] = useState('');
+  const screenTitle = useMemo(
+    () => (isEdit ? '编辑配置环境' : '添加配置环境'),
+    [isEdit],
+  );
+  const screenSubtitle = useMemo(
+    () => (isEdit ? '更新并保存 API 环境' : '新增并切换 API 环境'),
+    [isEdit],
+  );
+  const saveLabel = useMemo(
+    () => (isEdit ? '保存修改' : '保存并启用'),
+    [isEdit],
+  );
 
   function save() {
     const trimmedName = name.trim();
@@ -30,16 +53,24 @@ export function AddEnvironmentScreen() {
       return;
     }
 
-    const env = addEnvironment(trimmedName, trimmedUrl);
-    setActiveEnvironment(env.id);
+    if (isEdit && params.envId) {
+      const updated = updateEnvironment(params.envId, trimmedName, trimmedUrl);
+      if (!updated) {
+        setError('环境不存在');
+        return;
+      }
+    } else {
+      const env = addEnvironment(trimmedName, trimmedUrl);
+      setActiveEnvironment(env.id);
+    }
     navigation.goBack();
   }
 
   return (
     <Screen
       palette={palette}
-      title="添加配置环境"
-      subtitle="新增并切换 API 环境"
+      title={screenTitle}
+      subtitle={screenSubtitle}
     >
       <View style={styles.container}>
         <TextInput
@@ -70,7 +101,7 @@ export function AddEnvironmentScreen() {
           style={[styles.saveBtn, { backgroundColor: palette.primary }]}
           onPress={save}
         >
-          <Text style={styles.saveText}>保存并启用</Text>
+          <Text style={styles.saveText}>{saveLabel}</Text>
         </Pressable>
       </View>
     </Screen>

@@ -1,6 +1,15 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  ToastAndroid,
+  View,
+} from 'react-native';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { getActiveEnvironment } from '../../../shared/config/environment';
@@ -8,12 +17,20 @@ import { getActiveEnvironment } from '../../../shared/config/environment';
 type SettingsRowProps = {
   label: string;
   value?: string;
+  loading?: boolean;
   onPress?: () => void;
   showChevron?: boolean;
   isLast?: boolean;
 };
 
-function SettingsRow({ label, value, onPress, showChevron = true, isLast = false }: SettingsRowProps) {
+function SettingsRow({
+  label,
+  value,
+  loading = false,
+  onPress,
+  showChevron = true,
+  isLast = false,
+}: SettingsRowProps) {
   const palette = usePalette();
   const themedStyles = useMemo(
     () => ({
@@ -38,6 +55,9 @@ function SettingsRow({ label, value, onPress, showChevron = true, isLast = false
       >
         <Text style={[styles.rowLabel, themedStyles.label]}>{label}</Text>
         <View style={styles.rowRight}>
+          {loading ? (
+            <ActivityIndicator size="small" color={palette.primary} />
+          ) : null}
           {value ? (
             <Text style={[styles.rowValue, themedStyles.value]}>{value}</Text>
           ) : null}
@@ -91,6 +111,7 @@ export function SettingsScreen() {
   const { themeMode, homeOrientation } = useAppPreferences();
   const navigation = useNavigation<any>();
   const [activeEnvName, setActiveEnvName] = useState(getActiveEnvironment().name);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const themedStyles = useMemo(
     () => ({
       container: { flex: 1, backgroundColor: palette.background },
@@ -103,6 +124,17 @@ export function SettingsScreen() {
   }, []);
 
   useFocusEffect(reload);
+
+  const handleCheckUpdate = useCallback(() => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('正在检查更新（未实现）', ToastAndroid.SHORT);
+    }
+    setTimeout(() => {
+      setCheckingUpdate(false);
+    }, 1200);
+  }, [checkingUpdate]);
 
   return (
     <ScrollView
@@ -143,6 +175,8 @@ export function SettingsScreen() {
           label="版本"
           value="0.1.0"
           showChevron={false}
+          loading={checkingUpdate}
+          onPress={handleCheckUpdate}
           isLast
         />
       </Section>

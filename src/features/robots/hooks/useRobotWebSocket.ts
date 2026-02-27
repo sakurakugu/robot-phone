@@ -40,6 +40,10 @@ export type TtsOptions = {
   volume?: number;
 };
 
+type WsMessageEvent = {
+  data?: string | { toString(): string };
+};
+
 export type UseRobotWebSocketResult = {
   isConnected: boolean;
   connect: (robotId: string) => void;
@@ -126,10 +130,12 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       setIsConnected(true);
     };
 
-    ws.onmessage = (event: MessageEvent) => {
+    ws.onmessage = (event: WsMessageEvent) => {
       try {
+        const raw = event.data;
+        if (!raw) return;
         const data: WsMessage = JSON.parse(
-          typeof event.data === 'string' ? event.data : event.data.toString(),
+          typeof raw === 'string' ? raw : raw.toString(),
         );
         handlersRef.current.forEach(h => h(data));
       } catch { /* 忽略解析错误 */ }
@@ -153,7 +159,7 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       }
     };
   // openSocket 自引用，eslint 忽略
-   
+
   }, []);
 
   /** 连接到指定机器狗（robotId = 机器狗 UUID） */
