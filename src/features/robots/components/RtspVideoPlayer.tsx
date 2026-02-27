@@ -1,107 +1,125 @@
-import React, { useCallback, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
-// import Video, { VideoRef } from 'react-native-video';
+import { WhepVideoPlayer } from './WhepVideoPlayer';
 
 type Props = {
-  /** 机器狗 IP，如 192.168.234.1，端口与路径固定为 :8554/test */
+  /** 机器狗 IP，如 192.168.234.1
+   *  - WebRTC/WHEP 端口固定为 8889（mediamtx 默认）
+   *  - RTSP 备选端口为 8554
+   */
   robotIp: string;
 };
 
-/** RTSP 视频流播放器，直连机器狗本体摄像头。
- *  Android：优先使用 VLC，避免 ExoPlayer 的运行时校验异常。
- *  iOS：AVPlayer 不支持 RTSP，暂不可用。
+/** 视频播放器，直连机器狗本体摄像头。
+ *
+ *  主方案：WebRTC/WHEP（Android + iOS 均支持，低延迟）
+ *    机器狗运行 mediamtx，自动将 RTSP 流转换为 WebRTC，
+ *    WHEP 端点：http://<robotIp>:8889/test/whep
+ *
+ *  备用方案：RTSP + VLC（仅 Android，点击"切换 RTSP"启用）
  */
 export function RtspVideoPlayer({ robotIp }: Props) {
-  // const videoRef = useRef<VideoRef>(null);
-  const [error, setError] = useState<string | null>(null);
-  // 用 key 强制重新挂载播放器组件以实现重试
-  const [retryKey, setRetryKey] = useState(0);
+  /** true = WebRTC/WHEP（默认），false = RTSP/VLC（备用） */
+  const [useWebRtc, setUseWebRtc] = useState(true);
+  const [rtspError, setRtspError] = useState<string | null>(null);
+  const [rtspRetryKey, setRtspRetryKey] = useState(0);
 
-  /** 构造 RTSP 地址 */
+  /** WHEP 端点（mediamtx 默认端口 8889） */
+  const whepUrl = `http://${robotIp}:8889/test/whep`;
+  /** 备用 RTSP 地址 */
   const rtspUrl = `rtsp://${robotIp}:8554/test`;
 
-  const handleRetry = useCallback(() => {
-    setError(null);
-    setRetryKey(k => k + 1);
-  }, []);
+  // ── 切换按钮（浮于右下角）──────────────────────────────────────────────
+  const toggleBtn = (
+    <View style={styles.toggleContainer} pointerEvents="box-none">
+      <Pressable
+        onPress={() => {
+          setUseWebRtc(v => !v);
+          setRtspError(null);
+        }}
+        style={styles.toggleBtn}
+      >
+        <Text style={styles.toggleText}>
+          切换至 {useWebRtc ? 'RTSP' : 'WebRTC'}
+        </Text>
+      </Pressable>
+    </View>
+  );
 
-  if (Platform.OS === 'ios') {
+  // ── WebRTC/WHEP 主方案 ─────────────────────────────────────────────────
+  if (useWebRtc) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.hint}>iOS 暂不支持 RTSP 直连，请使用安卓设备</Text>
+      <View style={styles.container}>
+        <WhepVideoPlayer whepUrl={whepUrl} />
+        {toggleBtn}
       </View>
     );
   }
 
-  if (error) {
+  // ── RTSP/VLC 备用方案（仅 Android）────────────────────────────────────
+  if (rtspError) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.hint}>视频流连接失败</Text>
-        <Text style={styles.errorDetail}>{error}</Text>
-        <Text style={styles.url}>{rtspUrl}</Text>
-        <Pressable onPress={handleRetry} style={styles.retryBtn}>
-          <Text style={styles.retryText}>重新连接</Text>
-        </Pressable>
+      <View style={styles.container}>
+        <View style={styles.center}>
+          <Text style={styles.hint}>视频流连接失败</Text>
+          <Text style={styles.errorDetail}>{rtspError}</Text>
+          <Text style={styles.url}>{rtspUrl}</Text>
+          <Pressable
+            onPress={() => {
+              setRtspError(null);
+              setRtspRetryKey(k => k + 1);
+            }}
+            style={styles.retryBtn}
+          >
+            <Text style={styles.retryText}>重新连接</Text>
+          </Pressable>
+        </View>
+        {toggleBtn}
       </View>
     );
   }
 
   return (
-    // <Video
-    //   ref={videoRef}
-    //   source={{ uri: rtspUrl }}
-    //   style={styles.video}
-    //   resizeMode="contain"
-    //   /* 低延迟配置 */
-    //   bufferConfig={{
-    //     minBufferMs: 500,
-    //     maxBufferMs: 1000,
-    //     bufferForPlaybackMs: 200,
-    //     bufferForPlaybackAfterRebufferMs: 500,
-    //   }}
-    //   /* 自动播放、循环、无音频 */
-    //   muted
-    //   repeat
-    //   /* 事件回调 */
-    //   onError={e =>
-    //     setError(
-    //       e.error?.localizedDescription ?? e.error?.errorString ?? '未知错误',
-    //     )
-    //   }
-    //   onLoad={() => setError(null)}
-    // />
-    <View style={styles.videoContainer}>
-      <VLCPlayer
-        key={retryKey}
-        autoplay
-        muted
-        repeat
-        resizeMode="contain"
-        source={{
-          uri: rtspUrl,
-          initType: 2,
-          initOptions: [
-            '--rtsp-tcp',
-            '--network-caching=120',
-            '--avcodec-hw=none',
-          ],
-        }}
-        style={styles.video}
-        onError={e => {
-          const raw =
-            typeof e === 'string'
-              ? e
-              : ((e as { message?: string })?.message ?? JSON.stringify(e));
-          setError(`VLC 播放失败：${raw}`);
-        }}
-        onLoad={() => setError(null)}
-      />
+    <View style={styles.container}>
+      <View style={styles.videoContainer}>
+        <VLCPlayer
+          key={rtspRetryKey}
+          autoplay
+          muted
+          repeat
+          resizeMode="contain"
+          source={{
+            uri: rtspUrl,
+            initType: 2,
+            initOptions: [
+              '--rtsp-tcp',
+              '--network-caching=120',
+              '--avcodec-hw=none',
+            ],
+          }}
+          style={styles.video}
+          onError={e => {
+            const raw =
+              typeof e === 'string'
+                ? e
+                : ((e as { message?: string })?.message ?? JSON.stringify(e));
+            setRtspError(`VLC 播放失败：${raw}`);
+          }}
+          onLoad={() => setRtspError(null)}
+        />
+      </View>
+      {toggleBtn}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    position: 'relative',
+  },
   videoContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -145,5 +163,23 @@ const styles = StyleSheet.create({
     color: '#DCE7FF',
     fontSize: 13,
     fontWeight: '600',
+  },
+  // ── 切换方案按钮（右下角浮层）
+  toggleContainer: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+  },
+  toggleBtn: {
+    backgroundColor: 'rgba(23,33,52,0.75)',
+    borderWidth: 1,
+    borderColor: '#41506F',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  toggleText: {
+    color: '#8FA2C7',
+    fontSize: 11,
   },
 });
