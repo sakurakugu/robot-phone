@@ -2,6 +2,9 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// 为构建产物使用较短的路径，以避免 CMake 250 个字符的限制
+buildDir = "D:/.build/${rootProject.name}/${project.name}"
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -84,6 +87,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+    }
+    externalNativeBuild {
+        cmake {
+            // 对于 C++ 构建输出，使用较短的路径，以避免 Windows 系统的路径长度问题
+            buildStagingDirectory = file("D:/.build/${rootProject.name}/${project.name}/cxx")
+        }
     }
     signingConfigs {
         debug {
