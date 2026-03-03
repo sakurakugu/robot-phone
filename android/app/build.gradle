@@ -3,7 +3,8 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 // 为构建产物使用较短的路径，以避免 CMake 250 个字符的限制
-buildDir = "D:/.build/${rootProject.name}/${project.name}"
+// 电脑编码没改成 UTF-8，还是 GBK 就取消注释这个
+// buildDir = "D:/.build/${rootProject.name}/${project.name}"
 
 /**
  * This is the configuration block to customize your React Native Android app.

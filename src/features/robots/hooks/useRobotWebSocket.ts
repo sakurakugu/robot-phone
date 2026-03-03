@@ -18,8 +18,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveEnvironment, getApiBaseUrl } from '../../../shared/config/environment';
 
-// 后端 WebSocket 对话通道路径（与后端 server.ts 中的 basePath + '/business' 一致）
-const WS_CHAT_PATH = '/api/v1/interaction/connect/business';
+// 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）
+const WS_CHAT_PATH = '/api/v1/phone/business';
 const CONNECT_TIMEOUT_MS = 8000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY_MS = 2000; // 指数退避：2s, 4s, 8s, 16s, 32s
