@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Smartphone } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -12,8 +12,14 @@ import {
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { deleteRobot, fetchRobotGroups, fetchRobots } from '../api';
+import {
+  deleteRobot,
+  fetchRobotGroups,
+  fetchRobots,
+  syncDiscoveredRobots,
+} from '../api';
 import { RobotCard } from '../components/RobotCard';
+import { useMdnsDiscovery } from '../hooks/useMdnsDiscovery';
 import type { Robot } from '../types';
 
 const groupControlItems = [
@@ -24,10 +30,12 @@ export function RobotManagementScreen() {
   const palette = usePalette();
   const { homeOrientation, setHomeOrientation } = useAppPreferences();
   const navigation = useNavigation<any>();
+  const mdns = useMdnsDiscovery();
   const [robots, setRobots] = useState<Robot[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
+  const hasSyncedRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -39,16 +47,40 @@ export function RobotManagementScreen() {
       ]);
       setRobots(robotList);
       setGroups(groupList);
+      return robotList;
     } catch (e: any) {
       setError(e.message || '加载失败');
+      return [];
     } finally {
       setRefreshing(false);
     }
   }, []);
 
+  // 进入页面时加载数据，并在后台通过 mDNS 自动同步已有机器人信息
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData().then(robotList => {
+        // 每次 focus 时进行一次后台 mDNS 同步
+        if (robotList.length > 0) {
+          mdns
+            .scan(3)
+            .then(discovered => {
+              if (discovered.length > 0) {
+                syncDiscoveredRobots(discovered, robotList).then(
+                  ({ updated }) => {
+                    if (updated.length > 0) {
+                      loadData();
+                    }
+                  },
+                );
+              }
+            })
+            .catch(() => {
+              /* mDNS 同步失败不影响主流程 */
+            });
+        }
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loadData]),
   );
 
@@ -78,10 +110,7 @@ export function RobotManagementScreen() {
             style={{
               transform: [
                 {
-                  rotate:
-                    homeOrientation === 'portrait'
-                      ? '0deg'
-                      : '90deg',
+                  rotate: homeOrientation === 'portrait' ? '0deg' : '90deg',
                 },
               ],
             }}

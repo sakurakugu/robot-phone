@@ -1,4 +1,4 @@
-package com.robotphone
+package com.sparkrobot
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

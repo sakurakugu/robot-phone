@@ -51,7 +51,50 @@ export function updateRobotConfig(uuid: string, config: any): Promise<any> {
   return http.post<any>(`/robots/${uuid}/config`, config);
 }
 
-export async function discoverRobots(timeoutSec = 3): Promise<DiscoveredRobot[]> {
-  const data = await http.get<{ robots: DiscoveredRobot[] }>(`/robots/discover?timeout=${timeoutSec}`);
-  return data.robots ?? [];
+/**
+ * 根据 mDNS 发现结果，批量同步已有机器人的基础信息。
+ *
+ * 对比 discovered 列表与 existingRobots：
+ * - UUID 重合的 → 检测 name / ip / model 是否有变化，有变化则调用 updateRobot
+ * - 返回更新后的完整机器人列表
+ */
+export async function syncDiscoveredRobots(
+  discovered: DiscoveredRobot[],
+  existingRobots: Robot[],
+): Promise<{ updated: Robot[]; newDiscovered: DiscoveredRobot[] }> {
+  const existingMap = new Map(existingRobots.map(r => [r.uuid, r]));
+  const updated: Robot[] = [];
+  const newDiscovered: DiscoveredRobot[] = [];
+
+  const updatePromises: Promise<void>[] = [];
+
+  for (const d of discovered) {
+    const existing = existingMap.get(d.uuid);
+    if (!existing) {
+      newDiscovered.push(d);
+      continue;
+    }
+
+    // 检查是否需要更新
+    const needsUpdate =
+      existing.name !== d.name ||
+      existing.ip !== d.ip ||
+      existing.model !== d.model;
+
+    if (needsUpdate) {
+      const payload: RobotForm = {
+        name: d.name,
+        ip: d.ip,
+        model: d.model,
+      };
+      updatePromises.push(
+        updateRobot(d.uuid, payload)
+          .then(r => { updated.push(r); })
+          .catch(() => { /* 静默忽略单个更新失败 */ }),
+      );
+    }
+  }
+
+  await Promise.all(updatePromises);
+  return { updated, newDiscovered };
 }

@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { createRobot, discoverRobots, fetchRobots } from '../api';
+import { createRobot, fetchRobots, syncDiscoveredRobots } from '../api';
+import { useMdnsDiscovery } from '../hooks/useMdnsDiscovery';
 import type { DiscoveredRobot, Robot } from '../types';
 
 type MessageTone = 'info' | 'error';
@@ -18,12 +19,8 @@ type MessageTone = 'info' | 'error';
 export function AddRobotScreen() {
   const palette = usePalette();
   const navigation = useNavigation<any>();
+  const mdns = useMdnsDiscovery();
   const [robots, setRobots] = useState<Robot[]>([]);
-  const [discovering, setDiscovering] = useState(false);
-  const [hasScanned, setHasScanned] = useState(false);
-  const [discoveredRobots, setDiscoveredRobots] = useState<DiscoveredRobot[]>(
-    [],
-  );
   const [existingCollapsed, setExistingCollapsed] = useState(true);
   const [selectedDiscoveredRobot, setSelectedDiscoveredRobot] =
     useState<DiscoveredRobot | null>(null);
@@ -50,12 +47,12 @@ export function AddRobotScreen() {
     [robots],
   );
   const newlyDiscovered = useMemo(
-    () => discoveredRobots.filter(r => !existingUuids.has(r.uuid)),
-    [discoveredRobots, existingUuids],
+    () => mdns.results.filter(r => !existingUuids.has(r.uuid)),
+    [mdns.results, existingUuids],
   );
   const alreadyDiscovered = useMemo(
-    () => discoveredRobots.filter(r => existingUuids.has(r.uuid)),
-    [discoveredRobots, existingUuids],
+    () => mdns.results.filter(r => existingUuids.has(r.uuid)),
+    [mdns.results, existingUuids],
   );
 
   const loadExisting = useCallback(async () => {
@@ -74,31 +71,36 @@ export function AddRobotScreen() {
   }, [loadExisting]);
 
   const handleDiscover = useCallback(async () => {
-    setDiscovering(true);
-    setHasScanned(true);
-    setDiscoveredRobots([]);
     setSelectedDiscoveredRobot(null);
     setExistingCollapsed(true);
     setMessage('');
     try {
-      const list = await discoverRobots(3);
-      const existingUuidsSet = new Set(robots.map(r => r.uuid));
-      const filtered = list.filter(r => !existingUuidsSet.has(r.uuid));
-      setDiscoveredRobots(list);
-      if (filtered.length === 0 && list.length > 0) {
+      const list = await mdns.scan(3);
+      // 自动同步已有机器人的基础信息（IP / 名称 / 型号）
+      const { updated, newDiscovered } = await syncDiscoveredRobots(
+        list,
+        robots,
+      );
+      if (updated.length > 0) {
+        // 重新加载列表以反映更新
+        await loadExisting();
+      }
+      const msgs: string[] = [];
+      if (updated.length > 0) msgs.push(`已更新 ${updated.length} 台`);
+      if (newDiscovered.length > 0)
+        msgs.push(`发现 ${newDiscovered.length} 个新机器人`);
+      if (msgs.length > 0) {
         setMessageTone('info');
-        setMessage('所有发现的机器人都已添加');
-      } else if (filtered.length > 0) {
+        setMessage(msgs.join('，'));
+      } else if (list.length > 0) {
         setMessageTone('info');
-        setMessage(`发现 ${filtered.length} 个新机器人`);
+        setMessage('所有发现的机器人都已添加且信息一致');
       }
     } catch (e: any) {
       setMessageTone('error');
       setMessage(e?.message || '扫描失败');
-    } finally {
-      setDiscovering(false);
     }
-  }, [robots]);
+  }, [mdns, robots, loadExisting]);
 
   const selectDiscoveredRobot = useCallback(
     (robot: DiscoveredRobot) => {
@@ -166,13 +168,13 @@ export function AddRobotScreen() {
             style={[
               styles.scanBtn,
               themedStyles.scanBtn,
-              discovering ? styles.btnDisabled : styles.btnEnabled,
+              mdns.scanning ? styles.btnDisabled : styles.btnEnabled,
             ]}
             onPress={handleDiscover}
-            disabled={discovering}
+            disabled={mdns.scanning}
           >
             <Text style={styles.scanBtnText}>
-              {discovering ? '扫描中...' : '扫描'}
+              {mdns.scanning ? '扫描中...' : '扫描'}
             </Text>
           </Pressable>
         </View>
@@ -215,7 +217,7 @@ export function AddRobotScreen() {
           );
         })}
 
-        {!discovering && hasScanned && discoveredRobots.length === 0 ? (
+        {!mdns.scanning && mdns.hasScanned && mdns.results.length === 0 ? (
           <Text style={[styles.emptyText, { color: palette.textMuted }]}>
             未发现机器人
           </Text>
