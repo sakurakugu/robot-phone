@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -48,6 +49,48 @@ export function RobotWifiScreen() {
   const [wifiPassword, setWifiPassword] = useState('');
   const [wifiList, setWifiList] = useState<any[]>([]);
   const [showWifiList, setShowWifiList] = useState(false);
+  const [groupBySSID, setGroupBySSID] = useState(true);
+
+  const displayWifiList = useMemo(() => {
+    if (!groupBySSID) {
+      return wifiList;
+    }
+
+    const groups: Record<string, any> = {};
+    wifiList.forEach((item) => {
+      const ssid = item.ssid || item;
+      if (!ssid) return;
+
+      if (!groups[ssid]) {
+        groups[ssid] = item;
+      } else {
+        const existing = groups[ssid];
+        // Prioritize connected
+        if (existing.in_use) return;
+        if (item.in_use) {
+          groups[ssid] = item;
+          return;
+        }
+        // Prioritize stronger signal
+        const existingSignal = parseInt(existing.signal || '0', 10);
+        const newSignal = parseInt(item.signal || '0', 10);
+        if (newSignal > existingSignal) {
+          groups[ssid] = item;
+        }
+      }
+    });
+
+    const result = Object.values(groups);
+    // Sort
+    result.sort((a, b) => {
+      if (a.in_use) return -1;
+      if (b.in_use) return 1;
+      const aSignal = parseInt(a.signal || '0', 10);
+      const bSignal = parseInt(b.signal || '0', 10);
+      return bSignal - aSignal;
+    });
+    return result;
+  }, [wifiList, groupBySSID]);
 
   useEffect(() => {
     if (robotIp) {
@@ -142,11 +185,32 @@ export function RobotWifiScreen() {
       <Modal visible={showWifiList} animationType="slide" transparent>
         <View style={[styles.modalOverlay, themedStyles.modalOverlay]}>
           <View style={[styles.modalContent, themedStyles.modalContent]}>
-            <Text style={[styles.modalTitle, themedStyles.modalTitle]}>
-              WiFi 列表
-            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={[
+                  styles.modalTitle,
+                  themedStyles.modalTitle,
+                  { marginBottom: 0 },
+                ]}
+              >
+                WiFi 列表
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ marginRight: 8, color: palette.text }}>
+                  聚合
+                </Text>
+                <Switch value={groupBySSID} onValueChange={setGroupBySSID} />
+              </View>
+            </View>
             <FlatList
-              data={wifiList}
+              data={displayWifiList}
               keyExtractor={(item, index) => index.toString()}
               renderItem={({ item }) => (
                 <Pressable
@@ -160,7 +224,9 @@ export function RobotWifiScreen() {
                     {item.ssid || item} {item.in_use ? '(已连接)' : ''}
                   </Text>
                   {item.signal && (
-                    <Text style={[styles.modalSignal, themedStyles.modalSignalText]}>
+                    <Text
+                      style={[styles.modalSignal, themedStyles.modalSignalText]}
+                    >
                       信号: {item.signal}%
                     </Text>
                   )}
