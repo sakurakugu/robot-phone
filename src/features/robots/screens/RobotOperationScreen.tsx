@@ -43,7 +43,7 @@ import { useRobotTelemetry } from '../hooks/useRobotTelemetry';
 type RouteParams = {
   robotUuid: string;
   robotName?: string;
-  /** 机器狗本体 IP，用于直连 RTSP 视频流 */
+  /** 机器狗本体 IP，用于直连 WebRTC 视频流 */
   robotIp?: string;
 };
 

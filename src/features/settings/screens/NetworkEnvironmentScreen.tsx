@@ -1,7 +1,8 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     Alert,
+    ActivityIndicator,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import DeviceInfo from "react-native-device-info";
 import { usePalette } from '../../../app/theme/palette';
+import type { AppEnvironment } from '../../../shared/config/environment';
 import {
     getActiveEnvironment,
     listEnvironments,
@@ -23,6 +25,15 @@ export function NetworkEnvironmentScreen() {
   const [environments, setEnvironments] = useState(listEnvironments());
   const [activeId, setActiveId] = useState(getActiveEnvironment().id);
   const [ipAddress, setIpAddress] = useState('');
+  const [envConnectivity, setEnvConnectivity] = useState<
+    Record<string, boolean | null>
+  >({});
+  const abortControllersRef = useRef<AbortController[]>([]);
+  const checkSeqRef = useRef(0);
+  const checkingConnectivity = useMemo(
+    () => Object.values(envConnectivity).some(v => v === null),
+    [envConnectivity],
+  );
   const themedStyles = useMemo(
     () => ({
       container: { flex: 1, backgroundColor: palette.background },
@@ -33,6 +44,7 @@ export function NetworkEnvironmentScreen() {
       envNameInactive: { color: palette.text },
       activeBadge: { backgroundColor: palette.primary },
       envUrl: { color: palette.textMuted },
+      envUrlConnected: { color: palette.success },
       radioActive: {
         borderColor: palette.primary,
         backgroundColor: palette.primary,
@@ -52,8 +64,10 @@ export function NetworkEnvironmentScreen() {
   );
 
   const reload = useCallback(() => {
-    setEnvironments(listEnvironments());
+    const envs = listEnvironments();
+    setEnvironments(envs);
     setActiveId(getActiveEnvironment().id);
+    return envs;
   }, []);
 
   const loadIp = useCallback(async () => {
@@ -65,11 +79,85 @@ export function NetworkEnvironmentScreen() {
     }
   }, []);
 
+  const resetAbortControllers = useCallback(() => {
+    abortControllersRef.current.forEach(controller => controller.abort());
+    abortControllersRef.current = [];
+  }, []);
+
+  const probeEnvironment = useCallback(
+    async (env: AppEnvironment): Promise<boolean> => {
+      const controller = new AbortController();
+      abortControllersRef.current.push(controller);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      try {
+        const trimmedBaseUrl = env.baseUrl.replace(/\/$/, '');
+        const response = await fetch(`${trimmedBaseUrl}/api/v1/health`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          return false;
+        }
+        const text = await response.text();
+        if (!text) {
+          return true;
+        }
+        try {
+          const payload = JSON.parse(text) as { success?: boolean };
+          if (payload?.success === false) {
+            return false;
+          }
+        } catch {
+          return true;
+        }
+        return true;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    [],
+  );
+
+  const checkConnectivity = useCallback(
+    async (envs: AppEnvironment[]) => {
+      const seq = ++checkSeqRef.current;
+      resetAbortControllers();
+      setEnvConnectivity(() => {
+        const next: Record<string, boolean | null> = {};
+        envs.forEach(env => {
+          next[env.id] = null;
+        });
+        return next;
+      });
+      const results = await Promise.all(
+        envs.map(async env => ({
+          id: env.id,
+          ok: await probeEnvironment(env),
+        })),
+      );
+      if (checkSeqRef.current !== seq) return;
+      setEnvConnectivity(prev => {
+        const next = { ...prev };
+        results.forEach(result => {
+          next[result.id] = result.ok;
+        });
+        return next;
+      });
+    },
+    [probeEnvironment, resetAbortControllers],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      reload();
+      const envs = reload();
       loadIp();
-    }, [reload, loadIp]),
+      checkConnectivity(envs);
+      return () => {
+        checkSeqRef.current += 1;
+        resetAbortControllers();
+      };
+    }, [reload, loadIp, checkConnectivity, resetAbortControllers]),
   );
 
   function activate(id: string) {
@@ -96,9 +184,19 @@ export function NetworkEnvironmentScreen() {
       style={themedStyles.container}
       contentContainerStyle={styles.content}
     >
-      <Text style={[styles.sectionHeader, themedStyles.sectionHeader]}>
-        当前环境列表
-      </Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionHeaderText, themedStyles.sectionHeader]}>
+          当前环境列表
+        </Text>
+        {checkingConnectivity ? (
+          <View style={styles.checkingRow}>
+            <Text style={[styles.checkingText, themedStyles.sectionHeader]}>
+              正在检测连通性...
+            </Text>
+            <ActivityIndicator size="small" color={palette.textMuted} />
+          </View>
+        ) : null}
+      </View>
       <View style={[styles.group, themedStyles.group]}>
         {environments.map((env, idx) => {
           const active = env.id === activeId;
@@ -141,7 +239,14 @@ export function NetworkEnvironmentScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.envUrl, themedStyles.envUrl]}>
+                    <Text
+                      style={[
+                        styles.envUrl,
+                        envConnectivity[env.id]
+                          ? themedStyles.envUrlConnected
+                          : themedStyles.envUrl,
+                      ]}
+                    >
                       {env.baseUrl}
                     </Text>
                   </View>
@@ -213,6 +318,31 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 16,
     marginHorizontal: 20,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    marginTop: 16,
+    marginHorizontal: 20,
+  },
+  sectionHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  checkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checkingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   group: {
     marginHorizontal: 16,

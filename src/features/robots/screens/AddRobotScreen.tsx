@@ -254,11 +254,16 @@ export function AddRobotScreen() {
                   >
                     <View style={styles.discoveredRow}>
                       <View style={styles.discoveredMain}>
-                        <Text style={[styles.robotName, { color: palette.text }]}>
+                        <Text
+                          style={[styles.robotName, { color: palette.text }]}
+                        >
                           {robot.name}
                         </Text>
                         <Text
-                          style={[styles.robotMeta, { color: palette.textMuted }]}
+                          style={[
+                            styles.robotMeta,
+                            { color: palette.textMuted },
+                          ]}
                         >
                           {robot.model} · {robot.version}
                         </Text>
@@ -269,7 +274,9 @@ export function AddRobotScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={[styles.robotUuid, { color: palette.textMuted }]}>
+                    <Text
+                      style={[styles.robotUuid, { color: palette.textMuted }]}
+                    >
                       {robot.uuid}
                     </Text>
                   </View>

@@ -27,8 +27,8 @@
     "react-native-svg": "^15.15.3",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.19.0",
-    "react-native-vlc-media-player": "^1.0.98",
-    "react-native-webrtc": "^124.0.5"
+    "react-native-webrtc": "^124.0.5",
+    "react-native-zeroconf": "^0.14.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
