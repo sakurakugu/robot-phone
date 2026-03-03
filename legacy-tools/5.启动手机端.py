@@ -39,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--apk", "-ba", action="store_true")
     parser.add_argument("--debug", "-d", action="store_true")
     parser.add_argument("--release", "-rel", action="store_true")
+    parser.add_argument("--update_version", "-u", nargs="?", const=True, help="更新版本号 (e.g. 1.2.3)")
     parser.add_argument("--help", "-h", action="store_true")
     return parser.parse_args()
 
@@ -81,6 +82,8 @@ def resolve_action(ns: argparse.Namespace) -> Tuple[str, str]:
         return ("metro", build_type)
     if ns.apk or ns.build:
         return ("build_apk", build_type)
+    if ns.update_version:
+        return ("update_version", build_type)
     if ns.help:
         return ("help", build_type)
     return (_default_action(), build_type)
@@ -99,6 +102,7 @@ def show_help() -> None:
     print("  --start, -s       启动 Metro")
     print("  --build, -b       构建 Android Release APK")
     print("  --apk, -ba        构建 Android Release APK")
+    print("  --update_version, -u [VER] 更新版本号 (交互式或指定版本)")
     print("  --stop, -x        停止手机端相关进程")
     print("  --restart, -r     重启（默认平台）")
     print("  --help, -h        显示帮助")
@@ -117,6 +121,168 @@ def _get_project_name(android_dir: Path) -> str:
         except Exception:
             pass
     return "RobotPhone"
+
+
+def _parse_version(version_str: str) -> Tuple[str, int]:
+    """
+    解析版本号字符串，返回 (标准化版本号, 版本代码)
+    Example: "1.2.3" -> ("1.2.3", 1002003)
+    Logic: Major * 1,000,000 + Minor * 1,000 + Patch
+    """
+    parts = version_str.strip().split(".")
+    if len(parts) > 3:
+        raise ValueError(f"版本号格式错误 (最多3位): {version_str}")
+
+    # 补全 x.y.z
+    while len(parts) < 3:
+        parts.append("0")
+
+    try:
+        major = int(parts[0])
+        minor = int(parts[1])
+        patch = int(parts[2])
+    except ValueError:
+         raise ValueError(f"版本号包含非数字字符: {version_str}")
+
+    if minor >= 1000 or patch >= 1000:
+        raise ValueError("Minor 和 Patch 版本号不能超过 999")
+
+    version_code = major * 1000000 + minor * 1000 + patch
+    normalized_version = f"{major}.{minor}.{patch}"
+    return normalized_version, version_code
+
+
+def _get_android_current_version() -> Tuple[Optional[str], Optional[int]]:
+    """读取 Android 当前版本信息"""
+    gradle_file = ROBOT_PHONE / "android" / "app" / "build.gradle"
+    if not gradle_file.exists():
+        return None, None
+
+    content = gradle_file.read_text(encoding="utf-8")
+    name_match = re.search(r'versionName\s+"([^"]+)"', content)
+    code_match = re.search(r'versionCode\s+(\d+)', content)
+
+    v_name = name_match.group(1) if name_match else None
+    v_code = int(code_match.group(1)) if code_match else None
+    return v_name, v_code
+
+
+def _update_android_version(version_str: str, version_code: int) -> bool:
+    print("🤖 更新 Android 版本...")
+    gradle_file = ROBOT_PHONE / "android" / "app" / "build.gradle"
+    if not gradle_file.exists():
+        print(f"❌ 未找到 {gradle_file}")
+        return False
+
+    content = gradle_file.read_text(encoding="utf-8")
+
+    # 替换 versionName
+    new_content = re.sub(r'versionName\s+"[^"]+"', f'versionName "{version_str}"', content)
+    # 替换 versionCode
+    new_content = re.sub(r'versionCode\s+\d+', f'versionCode {version_code}', new_content)
+
+    if content == new_content:
+        print("   版本号未发生变化")
+        return False
+
+    gradle_file.write_text(new_content, encoding="utf-8")
+    print(f"\t✅ Android 版本已更新: {version_str} ({version_code})")
+    return True
+
+
+def _update_ios_version(version_str: str, version_code: int) -> bool:
+    print("🍎 更新 iOS 版本...")
+    project_file = ROBOT_PHONE / "ios" / "RobotPhone.xcodeproj" / "project.pbxproj"
+    if not project_file.exists():
+        print(f"❌ 未找到 {project_file}")
+        return False
+
+    content = project_file.read_text(encoding="utf-8")
+
+    # 替换 MARKETING_VERSION (versionName)
+    new_content = re.sub(r'(MARKETING_VERSION\s*=\s*)[^;]+;', f'\\g<1>{version_str};', content)
+    # 替换 CURRENT_PROJECT_VERSION (versionCode)
+    new_content = re.sub(r'(CURRENT_PROJECT_VERSION\s*=\s*)[^;]+;', f'\\g<1>{version_code};', new_content)
+
+    if content == new_content:
+        print("   版本号未发生变化")
+        return False
+
+    project_file.write_text(new_content, encoding="utf-8")
+    print(f"\t✅ iOS 版本已更新: {version_str} ({version_code})")
+    return True
+
+
+def update_version(ns: argparse.Namespace) -> int:
+    # 1. 确定目标平台
+    target_android = ns.android
+    target_ios = ns.ios
+
+    # 如果都未指定，默认两个都更新
+    if not target_android and not target_ios:
+        target_android = True
+        target_ios = True
+
+    # 2. 获取当前版本 (优先从 Android 获取，作为基准)
+    current_ver_str, current_ver_code = _get_android_current_version()
+    if not current_ver_str:
+        current_ver_str = "0.0.0"
+        current_ver_code = 0
+
+    print(f"ℹ️  当前版本 (Android): {current_ver_str} (Code: {current_ver_code})")
+
+    # 3. 确定新版本
+    new_ver_input = ns.update_version
+    if new_ver_input is True: # Flag provided but no value
+        try:
+            new_ver_input = input(f"请输入新版本号 (当前: {current_ver_str}): ").strip()
+        except KeyboardInterrupt:
+            print("\n取消更新")
+            return 1
+
+    if not new_ver_input:
+        print("❌ 未提供版本号")
+        return 1
+
+    try:
+        new_ver_str, new_ver_code = _parse_version(new_ver_input)
+    except ValueError as e:
+        print(f"❌ 版本号格式错误: {e}")
+        return 1
+
+    print(f"准备更新: {current_ver_str} -> {new_ver_str} (Code: {new_ver_code})")
+
+    # 4. 安全检查
+    if current_ver_code and new_ver_code < current_ver_code:
+        print(f"⚠️  警告: 新版本号 ({new_ver_code}) 小于当前版本号 ({current_ver_code})")
+        confirm = input("确认要降级吗？[y/N] ").lower()
+        if confirm != 'y':
+            print("已取消")
+            return 0
+
+    if current_ver_code and (new_ver_code - current_ver_code > 100000): # 跨度过大 (Major change)
+         print(f"⚠️  警告: 版本号跨度较大 ({current_ver_str} -> {new_ver_str})")
+         confirm = input("确认更新吗？[y/N] ").lower()
+         if confirm != 'y':
+            print("已取消")
+            return 0
+
+    # 5. 执行更新
+    success = True
+    if target_android:
+        if not _update_android_version(new_ver_str, new_ver_code):
+            success = False
+
+    if target_ios:
+        if not _update_ios_version(new_ver_str, new_ver_code):
+            success = False
+
+    if success:
+        print(f"✨ 版本更新完成！ {current_ver_str} -> {new_ver_str}")
+        return 0
+    else:
+        print("⚠️  部分更新失败或未发生变化")
+        return 1
 
 
 def _get_custom_build_dir(android_dir: Path) -> Optional[Path]:
@@ -178,6 +344,7 @@ def build_apk_debug() -> int:
             size_mb = round(apks[0].stat().st_size / 1024 / 1024, 2)
             print(f"✅ 构建成功！APK 路径：{apks[0]}  [{size_mb} MB]")
             # 自动打开文件夹
+            print(f"📂 正在打开输出目录：{apk_dir}")
             if os.name == "nt":
                 os.startfile(apk_dir)
             elif sys.platform == "darwin":
@@ -429,6 +596,9 @@ def main() -> int:
 
     if action == "build_apk":
         return build_apk(build_type)
+
+    if action == "update_version":
+        return update_version(ns)
 
     # 启动服务逻辑
     if action == "metro":

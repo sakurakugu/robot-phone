@@ -7,7 +7,6 @@ import { X2LingChuangScreen } from '../../features/robots/group-control/screens/
 import { X2NormalScreen } from '../../features/robots/group-control/screens/X2NormalScreen';
 import { X2TaiCiScreen } from '../../features/robots/group-control/screens/X2TaiCiScreen';
 import { X2TejiScreen } from '../../features/robots/group-control/screens/X2TejiScreen';
-import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
 import { AddRobotScreen } from '../../features/robots/screens/AddRobotScreen';
 import { RobotChatScreen } from '../../features/robots/screens/RobotChatScreen';
 import { RobotConfigScreen } from '../../features/robots/screens/RobotConfigScreen';
@@ -16,10 +15,12 @@ import { RobotLogScreen } from '../../features/robots/screens/RobotLogScreen';
 import { RobotOperationScreen } from '../../features/robots/screens/RobotOperationScreen';
 import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
 import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
+import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
 import { NetworkEnvironmentScreen } from '../../features/settings/screens/NetworkEnvironmentScreen';
 import { SettingsScreen } from '../../features/settings/screens/SettingsScreen';
+import { VersionHistoryScreen } from '../../features/settings/screens/VersionHistoryScreen';
 import { useAppPreferences } from '../preferences/AppPreferences';
 import { usePalette } from '../theme/palette';
 import { RootTabs } from './RootTabs';
@@ -69,6 +70,7 @@ export function RootStack() {
       <Stack.Screen name="外观设置" component={AppearanceScreen} />
       <Stack.Screen name="服务器环境" component={NetworkEnvironmentScreen} />
       <Stack.Screen name="添加配置环境" component={AddEnvironmentScreen} />
+      <Stack.Screen name="版本历史" component={VersionHistoryScreen} />
     </Stack.Navigator>
   );
 }

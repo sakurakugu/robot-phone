@@ -6,19 +6,22 @@ import {
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { UpdateDialog } from '../features/settings/components/UpdateDialog';
 import { initEnvironments } from '../shared/config/environment';
+import { ToastComponent } from '../shared/ui/Toast';
+import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { RootStack } from './navigation/RootStack';
 import {
   AppPreferencesProvider,
   useAppPreferences,
 } from './preferences/AppPreferences';
 import { usePalette } from './theme/palette';
-import { ToastComponent } from '../shared/ui/Toast';
 
 function AppContent() {
   const { activeThemeMode } = useAppPreferences();
   const isDarkMode = activeThemeMode === 'dark';
   const palette = usePalette();
+  const { updateInfo, dialogVisible, dismiss } = useAutoUpdateCheck();
 
   useEffect(() => {
     initEnvironments();
@@ -54,6 +57,11 @@ function AppContent() {
       <NavigationContainer theme={navigationTheme}>
         <RootStack />
       </NavigationContainer>
+      <UpdateDialog
+        visible={dialogVisible}
+        updateInfo={updateInfo}
+        onClose={dismiss}
+      />
       <ToastComponent />
     </SafeAreaProvider>
   );
