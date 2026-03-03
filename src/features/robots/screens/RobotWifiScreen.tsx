@@ -23,7 +23,7 @@ type RouteParams = {
 export function RobotWifiScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
-  const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const { robotIp } = (route.params || {}) as RouteParams;
   const themedStyles = useMemo(
     () => ({
       message: { color: palette.warning },
@@ -53,7 +53,7 @@ export function RobotWifiScreen() {
     if (robotIp) {
       const c = new RobotClient(robotIp);
       setClient(c);
-      c.login().catch(() => {});
+      c.login().catch(() => { });
     }
   }, [robotIp]);
 
@@ -97,8 +97,9 @@ export function RobotWifiScreen() {
   return (
     <Screen
       palette={palette}
-      title="WiFi 设置"
-      subtitle={robotName || robotUuid}
+      // title="WiFi 设置"
+      // subtitle={robotName || robotUuid}
+      unsafeTop={true}
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (

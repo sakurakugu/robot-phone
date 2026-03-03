@@ -9,16 +9,21 @@ export function Screen({
   subtitle,
   headerRight,
   children,
+  unsafeTop = false,
 }: {
   palette: Palette;
   title?: string;
   subtitle?: string;
   headerRight?: React.ReactNode;
   children: React.ReactNode;
+  unsafeTop?: boolean;
 }) {
   const showHeader = !!title || !!subtitle || !!headerRight;
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]}>
+    <SafeAreaView
+      edges={unsafeTop ? ['left', 'right', 'bottom'] : undefined}
+      style={[styles.screen, { backgroundColor: palette.background }]}
+    >
       {showHeader ? (
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -65,7 +70,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   subtitle: {
-    marginTop: 4,
+    marginTop: 16,
     fontSize: 13,
     fontWeight: '500',
   },

@@ -250,7 +250,7 @@ const pickerStyles = StyleSheet.create({
 export function RobotLogScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
-  const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const { robotIp } = (route.params || {}) as RouteParams;
   const themedStyles = useMemo(
     () => ({
       message: { color: palette.warning },
@@ -278,7 +278,7 @@ export function RobotLogScreen() {
     if (robotIp) {
       const c = new RobotClient(robotIp);
       setClient(c);
-      c.login().catch(() => {});
+      c.login().catch(() => { });
 
       const end = new Date();
       const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
@@ -334,8 +334,9 @@ export function RobotLogScreen() {
   return (
     <Screen
       palette={palette}
-      title="日志管理"
-      subtitle={robotName || robotUuid}
+      // title="日志管理"
+      // subtitle={robotName || robotUuid}
+      unsafeTop={true}
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (

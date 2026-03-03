@@ -2,17 +2,17 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  ToastAndroid,
   View,
 } from 'react-native';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { getActiveEnvironment } from '../../../shared/config/environment';
+import { Toast } from '../../../shared/ui/Toast';
+import DeviceInfo from 'react-native-device-info';
 
 type SettingsRowProps = {
   label: string;
@@ -128,9 +128,7 @@ export function SettingsScreen() {
   const handleCheckUpdate = useCallback(() => {
     if (checkingUpdate) return;
     setCheckingUpdate(true);
-    if (Platform.OS === 'android') {
-      ToastAndroid.show('正在检查更新（未实现）', ToastAndroid.SHORT);
-    }
+    Toast.show('正在检查更新（未实现）', Toast.SHORT);
     setTimeout(() => {
       setCheckingUpdate(false);
     }, 1200);
@@ -167,13 +165,13 @@ export function SettingsScreen() {
       <Section title="关于">
         <SettingsRow
           label="应用名称"
-          value="RobotPhone"
+          value={DeviceInfo.getApplicationName()}
           showChevron={false}
           isLast={false}
         />
         <SettingsRow
           label="版本"
-          value="0.1.0"
+          value={DeviceInfo.getVersion()}
           showChevron={false}
           loading={checkingUpdate}
           onPress={handleCheckUpdate}

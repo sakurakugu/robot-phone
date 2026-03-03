@@ -24,7 +24,7 @@ export function RobotGroupControlScreen() {
   const navigation = useNavigation<any>();
 
   return (
-    <Screen palette={palette} subtitle="选择群控类型">
+    <Screen palette={palette} subtitle="选择群控类型" unsafeTop={true}>
       <View style={styles.list}>
         {groupControls.map(item => (
           <Pressable

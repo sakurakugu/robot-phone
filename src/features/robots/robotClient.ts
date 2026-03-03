@@ -28,7 +28,7 @@ export class RobotClient {
     return res;
   }
 
-  async request(path: string, init?: RequestInit) {
+  async request(path: string, init?: RequestInit & { timeout?: number }) {
     const headers: any = {
       'Content-Type': 'application/json',
       ...(init?.headers || {}),
@@ -40,12 +40,14 @@ export class RobotClient {
       headers.Cookie = `session_token=${this.token}`;
     }
 
+    const { timeout = TIMEOUT, ...fetchInit } = init || {};
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
 
       const response = await fetch(`${this.baseUrl}${path}`, {
-        ...init,
+        ...fetchInit,
         headers,
         signal: controller.signal,
       } as any);
@@ -103,13 +105,14 @@ export class RobotClient {
 
   // WiFi 网络
   async scanWifi() {
-    return this.request('/api/v1/wifi/scan');
+    return this.request('/api/v1/wifi/scan', { timeout: 15000 });
   }
 
   async connectWifi(ssid: string, password: string) {
     return this.request('/api/v1/wifi/connect', {
       method: 'POST',
       body: JSON.stringify({ ssid, password }),
+      timeout: 15000,
     });
   }
 

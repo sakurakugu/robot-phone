@@ -13,6 +13,7 @@ import {
   useAppPreferences,
 } from './preferences/AppPreferences';
 import { usePalette } from './theme/palette';
+import { ToastComponent } from '../shared/ui/Toast';
 
 function AppContent() {
   const { activeThemeMode } = useAppPreferences();
@@ -53,6 +54,7 @@ function AppContent() {
       <NavigationContainer theme={navigationTheme}>
         <RootStack />
       </NavigationContainer>
+      <ToastComponent />
     </SafeAreaProvider>
   );
 }

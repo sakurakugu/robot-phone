@@ -86,9 +86,7 @@ function SelectModal({
     <Modal visible={visible} animationType="slide" transparent>
       <View style={modalStyles.overlay}>
         <View style={[modalStyles.sheet, themedStyles.sheet]}>
-          <Text style={[modalStyles.title, themedStyles.title]}>
-            {title}
-          </Text>
+          <Text style={[modalStyles.title, themedStyles.title]}>{title}</Text>
           <FlatList
             data={options}
             keyExtractor={item => item}
@@ -113,9 +111,7 @@ function SelectModal({
                 >
                   {item}
                 </Text>
-                {item === selected && (
-                  <Text style={themedStyles.check}>✓</Text>
-                )}
+                {item === selected && <Text style={themedStyles.check}>✓</Text>}
               </Pressable>
             )}
           />
@@ -162,7 +158,7 @@ const modalStyles = StyleSheet.create({
 export function RobotConfigScreen() {
   const palette = usePalette();
   const route = useRoute<any>();
-  const { robotUuid, robotName, robotIp } = (route.params || {}) as RouteParams;
+  const { robotIp } = (route.params || {}) as RouteParams;
   const themedStyles = useMemo(
     () => ({
       message: { color: palette.warning },
@@ -201,7 +197,7 @@ export function RobotConfigScreen() {
     if (robotIp) {
       const c = new RobotClient(robotIp);
       setClient(c);
-      c.login().catch(() => {});
+      c.login().catch(() => { });
     }
   }, [robotIp]);
 
@@ -422,22 +418,21 @@ export function RobotConfigScreen() {
     : null;
   const selectModalCurrent = selectModalField
     ? String(
-        (configData[selectModalField.section] || {})[selectModalField.key] ??
-          '',
-      )
+      (configData[selectModalField.section] || {})[selectModalField.key] ??
+      '',
+    )
     : '';
 
   return (
     <Screen
       palette={palette}
-      title="高级配置"
-      subtitle={robotName || robotUuid}
+      // title="高级配置"
+      // subtitle={robotName || robotUuid}
+      unsafeTop={true}
     >
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
-          <Text style={[styles.message, themedStyles.message]}>
-            {message}
-          </Text>
+          <Text style={[styles.message, themedStyles.message]}>{message}</Text>
         ) : null}
 
         <Section title="SDK 群控配置">

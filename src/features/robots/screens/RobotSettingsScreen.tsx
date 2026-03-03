@@ -301,7 +301,7 @@ export function RobotSettingsScreen() {
   };
 
   return (
-    <Screen palette={palette}>
+    <Screen palette={palette} unsafeTop={true}>
       <ScrollView contentContainerStyle={styles.content}>
         {message ? (
           <Text style={[styles.message, { color: palette.warning }]}>

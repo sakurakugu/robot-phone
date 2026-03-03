@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Smartphone } from 'lucide-react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -35,7 +35,6 @@ export function RobotManagementScreen() {
   const [groups, setGroups] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
-  const hasSyncedRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
