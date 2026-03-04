@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Cloud, CloudOff } from 'lucide-react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
+import { useRobotWebSocket } from '../../robots/hooks/useRobotWebSocket';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
@@ -14,11 +16,19 @@ const menu = [
 export function ProfileScreen() {
   const palette = usePalette();
   const navigation = useNavigation<any>();
+  const { isConnected } = useRobotWebSocket();
 
   return (
     <Screen palette={palette} title="我的" subtitle="账户与系统">
       <View style={[styles.profile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <Text style={[styles.name, { color: palette.text }]}>Admin 管理员</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.name, { color: palette.text }]}>Admin 管理员</Text>
+          {isConnected ? (
+            <Cloud size={20} color={palette.success} fill={palette.success} />
+          ) : (
+            <CloudOff size={20} color={palette.textMuted} />
+          )}
+        </View>
         <Text style={[styles.meta, { color: palette.textMuted }]}>云端机器人与角色管理已接入</Text>
       </View>
 
@@ -49,6 +59,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   name: {
     fontSize: 18,

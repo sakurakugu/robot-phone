@@ -4,7 +4,7 @@
  * 手机端连接后端服务器的 WebSocket Hook。
  *
  * 连接方式：
- *   /api/v1/interaction/connect/business?robotId={robotUUID}&role=ui
+ *   /api/v1/phone/business?robotId={robotUUID}&role=ui
  *   ↑ robotId  = 目标机器狗的 UUID（告诉服务器订阅哪台机器狗的消息）
  *   ↑ role=ui  = 标识本端是 UI 客户端（机器狗端使用 role=robot）
  *
@@ -13,6 +13,8 @@
  *   接收：text_response / asr_transcript / error
  *
  * 特性：连接超时检测、断线自动重连（指数退避，最多 5 次）
+ *
+ * WebSocket 地址自动派生：从环境配置的 baseUrl 派生为 ws:// 或 wss:// 前缀
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -60,32 +62,18 @@ export type UseRobotWebSocketResult = {
   onMessage: (handler: MessageHandler) => () => void;
 };
 
-/** 将 http/https baseUrl 转为对应的 ws/wss URL */
+/** 将 http/https baseUrl 转为对应的 ws/wss URL，并拼接路径 */
 function toWsUrl(baseUrl: string, path: string, robotId: string): string {
   const wsBase = baseUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
   return `${wsBase}${path}?robotId=${robotId}&role=ui`;
 }
 
-/** 从服务器拉取 UI 配置，获取可能自定义的 WS 地址 */
-async function fetchWsChatUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(`${getApiBaseUrl()}/config/ui`).then(r => r.json());
-    if (res?.success && res.data?.wsBusinessUrl) {
-      return String(res.data.wsBusinessUrl);
-    }
-  } catch {
-    // 忽略，使用本地环境配置
-  }
-  return null;
-}
-
 export function useRobotWebSocket(): UseRobotWebSocketResult {
   const wsRef = useRef<WebSocket | null>(null);
   const robotIdRef = useRef<string>('');
-  const serverBaseRef = useRef<string>('');    // 缓存已解析的服务器地址
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
-  const destroyedRef = useRef(false);           // 组件卸载后禁止重连
+  const destroyedRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
   const handlersRef = useRef<Set<MessageHandler>>(new Set());
@@ -173,13 +161,9 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       robotIdRef.current = robotId;
       reconnectCountRef.current = 0;
 
-      // 解析服务器地址：优先从后端配置接口获取，其次用本地活跃环境
-      if (!serverBaseRef.current) {
-        const remoteBase = await fetchWsChatUrl();
-        serverBaseRef.current = remoteBase || getActiveEnvironment().baseUrl;
-      }
-
-      openSocket(robotId, toWsUrl(serverBaseRef.current, WS_CHAT_PATH, robotId));
+      // 使用环境配置的 baseUrl 自动派生 WebSocket 地址
+      const serverBase = getActiveEnvironment().baseUrl;
+      openSocket(robotId, toWsUrl(serverBase, WS_CHAT_PATH, robotId));
     },
     [disconnect, openSocket],
   );
