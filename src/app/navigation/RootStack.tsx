@@ -1,5 +1,9 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
+import { AuthScreen } from '../../features/auth/screens/AuthScreen';
+import { LoginSessionsScreen } from '../../features/profile/screens/LoginSessionsScreen';
+import { PersonalCenterScreen } from '../../features/profile/screens/PersonalCenterScreen';
+import { PersonalProfileScreen } from '../../features/profile/screens/PersonalProfileScreen';
 import { D1ControlScreen } from '../../features/robots/group-control/screens/D1ControlScreen';
 import { X2ControlScreen } from '../../features/robots/group-control/screens/X2ControlScreen';
 import { X2HaidilaoScreen } from '../../features/robots/group-control/screens/X2HaidilaoScreen';
@@ -71,6 +75,10 @@ export function RootStack() {
       <Stack.Screen name="服务器环境" component={NetworkEnvironmentScreen} />
       <Stack.Screen name="添加配置环境" component={AddEnvironmentScreen} />
       <Stack.Screen name="版本历史" component={VersionHistoryScreen} />
+      <Stack.Screen name="账号登录" component={AuthScreen} />
+      <Stack.Screen name="登录设备" component={LoginSessionsScreen} />
+      <Stack.Screen name="个人中心" component={PersonalCenterScreen} />
+      <Stack.Screen name="个人资料" component={PersonalProfileScreen} />
     </Stack.Navigator>
   );
 }

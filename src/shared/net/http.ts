@@ -1,3 +1,4 @@
+import { getAuthToken } from '../../features/auth/AuthContext';
 import { getApiBaseUrl } from '../config/environment';
 
 type ApiEnvelope<T> = {
@@ -9,9 +10,13 @@ type ApiEnvelope<T> = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      'x-client-type': 'mobile',
+      'x-device-name': 'RobotPhone',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
     ...init,
