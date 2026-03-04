@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getActiveEnvironment, getApiBaseUrl } from '../../../shared/config/environment';
+import { getActiveEnvironment } from '../../../shared/config/environment';
 
 // 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）
 const WS_CHAT_PATH = '/api/v1/phone/business';

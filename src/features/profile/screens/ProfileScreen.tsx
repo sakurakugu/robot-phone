@@ -1,7 +1,7 @@
-import React from 'react';
 import { useNavigation } from '@react-navigation/native';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Cloud, CloudOff } from 'lucide-react-native';
+import React from 'react';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
@@ -20,16 +20,25 @@ export function ProfileScreen() {
 
   return (
     <Screen palette={palette} title="我的" subtitle="账户与系统">
-      <View style={[styles.profile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+      <View
+        style={[
+          styles.profile,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
         <View style={styles.headerRow}>
-          <Text style={[styles.name, { color: palette.text }]}>Admin 管理员</Text>
+          <Text style={[styles.name, { color: palette.text }]}>
+            Admin 管理员
+          </Text>
           {isConnected ? (
             <Cloud size={20} color={palette.success} fill={palette.success} />
           ) : (
             <CloudOff size={20} color={palette.textMuted} />
           )}
         </View>
-        <Text style={[styles.meta, { color: palette.textMuted }]}>云端机器人与角色管理已接入</Text>
+        <Text style={[styles.meta, { color: palette.textMuted }]}>
+          云端机器人与角色管理已接入
+        </Text>
       </View>
 
       <FlatList
