@@ -6,8 +6,9 @@ import {
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { UpdateDialog } from '../features/settings/components/UpdateDialog';
 import { AuthProvider } from '../features/auth/AuthContext';
+import { ServerConnectionProvider } from '../features/server/ServerConnectionContext';
+import { UpdateDialog } from '../features/settings/components/UpdateDialog';
 import { initEnvironments } from '../shared/config/environment';
 import { ToastComponent } from '../shared/ui/Toast';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
@@ -72,7 +73,9 @@ function App() {
   return (
     <AuthProvider>
       <AppPreferencesProvider>
-        <AppContent />
+        <ServerConnectionProvider>
+          <AppContent />
+        </ServerConnectionProvider>
       </AppPreferencesProvider>
     </AuthProvider>
   );

@@ -6,7 +6,7 @@ import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
 import { useAuth } from '../../auth/AuthContext';
-import { useRobotWebSocket } from '../../robots/hooks/useRobotWebSocket';
+import { useServerConnection } from '../../server/ServerConnectionContext';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
@@ -16,7 +16,7 @@ const menu = [
 export function ProfileScreen() {
   const palette = usePalette();
   const navigation = useNavigation<any>();
-  const { isConnected } = useRobotWebSocket();
+  const { isConnected, reconnect } = useServerConnection();
   const { mode, user } = useAuth();
 
   return (
@@ -36,7 +36,10 @@ export function ProfileScreen() {
             </Text>
           </View>
           <Pressable
-            style={({ pressed }) => [styles.userInfo, { opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [
+              styles.userInfo,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
             onPress={() => {
               if (mode === 'authenticated') {
                 navigation.navigate('个人中心');
@@ -58,11 +61,20 @@ export function ProfileScreen() {
               </Text>
             )}
           </Pressable>
-          {isConnected ? (
-            <Cloud size={20} color={palette.success} fill={palette.success} />
-          ) : (
-            <CloudOff size={20} color={palette.textMuted} />
-          )}
+          <Pressable
+            onPress={reconnect}
+            hitSlop={12}
+            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            accessibilityLabel={
+              isConnected ? '服务器已连接，点击重连' : '服务器未连接，点击重连'
+            }
+          >
+            {isConnected ? (
+              <Cloud size={20} color={palette.success} fill={palette.success} />
+            ) : (
+              <CloudOff size={20} color={palette.textMuted} />
+            )}
+          </Pressable>
         </View>
       </View>
 
