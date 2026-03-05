@@ -20,6 +20,7 @@ import { RobotOperationScreen } from '../../features/robots/screens/RobotOperati
 import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
 import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
 import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
+import { SshTerminalScreen } from '../../features/discover/screens/SshTerminalScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
 import { NetworkEnvironmentScreen } from '../../features/settings/screens/NetworkEnvironmentScreen';
@@ -79,6 +80,7 @@ export function RootStack() {
       <Stack.Screen name="登录设备" component={LoginSessionsScreen} />
       <Stack.Screen name="个人中心" component={PersonalCenterScreen} />
       <Stack.Screen name="个人资料" component={PersonalProfileScreen} />
+      <Stack.Screen name="SSH 终端" component={SshTerminalScreen} />
     </Stack.Navigator>
   );
 }
