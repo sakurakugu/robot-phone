@@ -1,4 +1,5 @@
 import { http } from '../../shared/net/http';
+import { getApiBaseUrl } from '../../shared/config/environment';
 import type { DiscoveredRobot, Robot, RobotForm } from './types';
 
 export async function fetchRobots(): Promise<Robot[]> {
@@ -97,4 +98,34 @@ export async function syncDiscoveredRobots(
 
   await Promise.all(updatePromises);
   return { updated, newDiscovered };
+}
+
+/** 安装包信息 */
+export type PackageFileInfo = {
+  fileName: string;
+  fileSize: number;
+  fileHash: string;
+};
+
+export type ActivePackageInfo = {
+  id: number;
+  versionCode: number;
+  channel: string;
+  changelog: string | null;
+  uploadedAt: string;
+  agent: PackageFileInfo | null;
+  server: PackageFileInfo | null;
+  common: PackageFileInfo | null;
+};
+
+export type PackageType = 'agent' | 'server' | 'common';
+
+/** 获取云端当前活跃安装包信息 */
+export async function getActivePackage(channel = 'stable'): Promise<ActivePackageInfo | null> {
+  return http.get<ActivePackageInfo | null>(`/robot-packages/active?channel=${channel}`);
+}
+
+/** 获取安装包下载 URL（直接指向文件流） */
+export function getPackageDownloadUrl(type: PackageType, channel = 'stable'): string {
+  return `${getApiBaseUrl()}/robot-packages/download/${type}?channel=${channel}`;
 }

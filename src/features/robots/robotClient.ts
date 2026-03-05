@@ -1,3 +1,5 @@
+import ReactNativeBlobUtil from 'react-native-blob-util';
+
 const TIMEOUT = 5000;
 const PORT = 8080;
 
@@ -200,5 +202,19 @@ export class RobotClient {
     return this.request('/api/v1/sdk/motion/restart', {
       method: 'POST',
     });
+  }
+
+  // 安装包上传
+  async uploadPackage(type: 'agent' | 'server' | 'common', filePath: string): Promise<{ success: boolean; message?: string }> {
+    const filename = `${type}.tar.gz`;
+    const url = `${this.baseUrl}/api/v1/packages/upload?type=${type}`;
+    const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
+    if (this.token) {
+      headers.Cookie = `session_token=${this.token}`;
+    }
+    const res = await ReactNativeBlobUtil.fetch('POST', url, headers, [
+      { name: 'file', filename, type: 'application/gzip', data: ReactNativeBlobUtil.wrap(filePath) },
+    ]);
+    return res.json();
   }
 }

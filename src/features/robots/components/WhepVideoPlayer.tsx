@@ -63,7 +63,7 @@ export function WhepVideoPlayer({ whepUrl }: Props) {
         pcRef.current = pc;
 
         // 监听远端轨道
-        pc.ontrack = event => {
+        (pc as any).ontrack = (event: any) => {
           if (cancelled) return;
           // event.streams[0] 含有所有轨道
           const remoteStream = event.streams?.[0];
@@ -74,7 +74,7 @@ export function WhepVideoPlayer({ whepUrl }: Props) {
           }
         };
 
-        pc.oniceconnectionstatechange = () => {
+        (pc as any).oniceconnectionstatechange = () => {
           if (cancelled) return;
           const s = pc.iceConnectionState;
           if (s === 'failed' || s === 'disconnected' || s === 'closed') {

@@ -1,10 +1,24 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Volume, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { fetchRobot, updateRobot } from '../api';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import {
+  fetchRobot,
+  updateRobot,
+  getActivePackage,
+  getPackageDownloadUrl,
+} from '../api';
+import type { ActivePackageInfo, PackageType } from '../api';
 import {
   ActionRow,
   InfoRow,
@@ -12,6 +26,7 @@ import {
   Section,
 } from '../components/SettingsComponents';
 import { RobotClient } from '../robotClient';
+import { versionCodeToSemver } from '../../settings/services/updateService';
 import type { RobotForm } from '../types';
 
 type RouteParams = {
@@ -168,6 +183,145 @@ function splitTags(input: string): string[] {
     .filter(Boolean);
 }
 
+type PackageActionRowProps = {
+  type: PackageType;
+  hasPkg: boolean;
+  downloaded: boolean;
+  uploaded: boolean;
+  installed: boolean;
+  status?: 'downloading' | 'uploading';
+  isLast: boolean;
+  onDownload: () => void;
+  onUpload: () => void;
+  onInstall: () => void;
+};
+
+function PackageActionRow({
+  type,
+  hasPkg,
+  downloaded,
+  uploaded,
+  installed,
+  status,
+  isLast,
+  onDownload,
+  onUpload,
+  onInstall,
+}: PackageActionRowProps) {
+  const palette = usePalette();
+  const themedStyles = useMemo(
+    () => ({
+      row: { backgroundColor: palette.surface },
+      label: { color: palette.text },
+      subtitle: { color: palette.textMuted },
+      divider: { backgroundColor: palette.border },
+      downloadText: { color: palette.primary },
+      uploadText: { color: palette.success },
+      downloadBorder: { borderColor: palette.primary },
+      uploadBorder: { borderColor: palette.success },
+      installText: { color: palette.textMuted },
+      installBorder: { borderColor: palette.textMuted },
+      installedText: { color: palette.textMuted },
+      installedBorder: { borderColor: palette.textMuted },
+      pressed: { backgroundColor: palette.surfaceAlt },
+    }),
+    [palette],
+  );
+  const downloading = status === 'downloading';
+  const uploading = status === 'uploading';
+  const downloadDisabled = !hasPkg || downloading || uploading;
+  const uploadDisabled = !downloaded || uploading || downloading;
+  const installDisabled = !uploaded || downloading || uploading;
+  const downloadLabel = downloaded ? '已下载' : '下载到手机';
+  const uploadLabel = uploaded ? '已上传' : '上传到机器人';
+  const subtitle = downloaded
+    ? '已下载，可重新下载'
+    : hasPkg
+      ? '从云端下载到本机'
+      : '云端暂无此包';
+
+  return (
+    <>
+      <View style={[pkgStyles.row, themedStyles.row]}>
+        <View style={pkgStyles.rowInfo}>
+          <Text style={[pkgStyles.rowLabel, themedStyles.label]}>{type}</Text>
+          <Text style={[pkgStyles.rowSubtitle, themedStyles.subtitle]}>
+            {subtitle}
+          </Text>
+        </View>
+        <View style={pkgStyles.rowActions}>
+          <Pressable
+            style={({ pressed }) => [
+              pkgStyles.actionBtn,
+              themedStyles.downloadBorder,
+              pressed && themedStyles.pressed,
+              downloadDisabled && pkgStyles.actionDisabled,
+            ]}
+            onPress={downloadDisabled ? undefined : onDownload}
+          >
+            {downloading ? (
+              <ActivityIndicator size="small" color={palette.primary} />
+            ) : (
+              <Text style={[pkgStyles.actionText, themedStyles.downloadText]}>
+                {downloadLabel}
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              pkgStyles.actionBtn,
+              pkgStyles.actionBtnGap,
+              themedStyles.uploadBorder,
+              pressed && themedStyles.pressed,
+              uploadDisabled && pkgStyles.actionDisabled,
+            ]}
+            onPress={uploadDisabled ? undefined : onUpload}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color={palette.success} />
+            ) : (
+              <Text style={[pkgStyles.actionText, themedStyles.uploadText]}>
+                {uploadLabel}
+              </Text>
+            )}
+          </Pressable>
+          {installed ? (
+            <Pressable
+              style={({ pressed }) => [
+                pkgStyles.actionBtn,
+                pkgStyles.actionBtnGap,
+                themedStyles.installedBorder,
+                pressed && themedStyles.pressed,
+                pkgStyles.actionDisabled,
+              ]}
+            >
+              <Text style={[pkgStyles.actionText, themedStyles.installedText]}>
+                已安装
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                pkgStyles.actionBtn,
+                pkgStyles.actionBtnGap,
+                themedStyles.installBorder,
+                pressed && themedStyles.pressed,
+                installDisabled && pkgStyles.actionDisabled,
+              ]}
+              onPress={installDisabled ? undefined : onInstall}
+            >
+              <Text style={[pkgStyles.actionText, themedStyles.installText]}>
+                安装
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+      {!isLast && <View style={[pkgStyles.divider, themedStyles.divider]} />}
+    </>
+  );
+}
+
 // --- 主屏幕 ---
 
 export function RobotSettingsScreen() {
@@ -178,6 +332,23 @@ export function RobotSettingsScreen() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // 安装包管理
+  const [activePackage, setActivePackage] = useState<ActivePackageInfo | null>(
+    null,
+  );
+  const [downloadedPaths, setDownloadedPaths] = useState<
+    Partial<Record<PackageType, string>>
+  >({});
+  const [uploadedFlags, setUploadedFlags] = useState<
+    Partial<Record<PackageType, boolean>>
+  >({});
+  const [installedFlags, setInstalledFlags] = useState<
+    Partial<Record<PackageType, boolean>>
+  >({});
+  const [pkgStatus, setPkgStatus] = useState<
+    Partial<Record<PackageType, 'downloading' | 'uploading'>>
+  >({});
 
   // 客户端状态
   const [client, setClient] = useState<RobotClient | null>(null);
@@ -220,6 +391,11 @@ export function RobotSettingsScreen() {
           setIsConnected(true);
           setMessage('已连接到机器人');
 
+          // 初始加载安装包信息
+          getActivePackage()
+            .then(pkg => setActivePackage(pkg))
+            .catch(() => {});
+
           // 初始加载音量
           const volData = await c.getVolume();
           if (volData.success) {
@@ -253,7 +429,6 @@ export function RobotSettingsScreen() {
   useEffect(() => {
     loadRobot();
   }, [loadRobot]);
-
 
   async function handleSaveBasic() {
     const payload: RobotForm = {
@@ -298,6 +473,52 @@ export function RobotSettingsScreen() {
       await client.markLog('手动标记');
       setMessage('日志标记已写入');
     });
+  };
+
+  const handleDownloadPackage = async (type: PackageType) => {
+    const pkg = activePackage?.[type];
+    if (!pkg) return;
+    setPkgStatus(prev => ({ ...prev, [type]: 'downloading' }));
+    setMessage('');
+    try {
+      const url = getPackageDownloadUrl(type);
+      const destPath = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${type}.tar.gz`;
+      // 若已存在则先删除
+      if (await ReactNativeBlobUtil.fs.exists(destPath)) {
+        await ReactNativeBlobUtil.fs.unlink(destPath);
+      }
+      const res = await ReactNativeBlobUtil.config({
+        path: destPath,
+        fileCache: false,
+      }).fetch('GET', url);
+      if (res.info().status !== 200) {
+        throw new Error(`下载失败，状态码: ${res.info().status}`);
+      }
+      setDownloadedPaths(prev => ({ ...prev, [type]: destPath }));
+      setUploadedFlags(prev => ({ ...prev, [type]: false }));
+      setInstalledFlags(prev => ({ ...prev, [type]: false }));
+      setMessage(`${type} 安装包已下载到手机`);
+    } catch (e: any) {
+      setMessage(e.message || '下载失败');
+    } finally {
+      setPkgStatus(prev => ({ ...prev, [type]: undefined }));
+    }
+  };
+
+  const handleUploadPackage = async (type: PackageType) => {
+    const filePath = downloadedPaths[type];
+    if (!client || !filePath) return;
+    setPkgStatus(prev => ({ ...prev, [type]: 'uploading' }));
+    setMessage('');
+    try {
+      await client.uploadPackage(type, filePath);
+      setUploadedFlags(prev => ({ ...prev, [type]: true }));
+      setMessage(`${type} 安装包已上传到机器人`);
+    } catch (e: any) {
+      setMessage(e.message || '上传失败');
+    } finally {
+      setPkgStatus(prev => ({ ...prev, [type]: undefined }));
+    }
   };
 
   return (
@@ -409,6 +630,44 @@ export function RobotSettingsScreen() {
                 isLast
               />
             </Section>
+
+            <Section title="安装包管理">
+              {activePackage ? (
+                <InfoRow
+                  label="云端版本"
+                  value={`v${versionCodeToSemver(activePackage.versionCode)} (${activePackage.channel})`}
+                />
+              ) : (
+                <InfoRow label="云端版本" value="暂无可用安装包" />
+              )}
+              {(['common', 'server', 'agent'] as PackageType[]).map(
+                (type, idx, arr) => {
+                  const hasPkg = !!activePackage?.[type];
+                  const isLast = idx === arr.length - 1;
+                  const status = pkgStatus[type];
+                  const downloaded = !!downloadedPaths[type];
+                  const uploaded = !!uploadedFlags[type];
+                  const installed = !!installedFlags[type];
+                  return (
+                    <PackageActionRow
+                      key={type}
+                      type={type}
+                      hasPkg={hasPkg}
+                      downloaded={downloaded}
+                      uploaded={uploaded}
+                      installed={installed}
+                      status={status}
+                      onDownload={() => handleDownloadPackage(type)}
+                      onUpload={() => handleUploadPackage(type)}
+                      onInstall={() =>
+                        setInstalledFlags(prev => ({ ...prev, [type]: true }))
+                      }
+                      isLast={isLast}
+                    />
+                  );
+                },
+              )}
+            </Section>
           </>
         ) : (
           <Section title="机器人连接">
@@ -441,5 +700,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 10,
     textAlign: 'center',
+  },
+});
+
+const pkgStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 48,
+  },
+  rowInfo: {
+    flex: 1,
+  },
+  rowLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  rowSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+  },
+  actionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnGap: {
+    marginLeft: 8,
+    marginTop: 6,
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionDisabled: {
+    opacity: 0.5,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16,
   },
 });
