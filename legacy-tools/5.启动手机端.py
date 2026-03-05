@@ -558,6 +558,7 @@ def monitor(pids: List[Tuple[str, int]]) -> int:
 
 
 def main() -> int:
+    print("\033]0;手机端\007")
     ns = parse_args()
     action, build_type = resolve_action(ns)
 
