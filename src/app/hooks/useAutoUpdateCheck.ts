@@ -34,7 +34,11 @@ export function useAutoUpdateCheck() {
 
     (async () => {
       try {
-        const rawAuto = await AsyncStorage.getItem(STORAGE_KEY_AUTO_UPDATE);
+        let rawAuto = await AsyncStorage.getItem(STORAGE_KEY_AUTO_UPDATE);
+        if (rawAuto === null) {
+          await AsyncStorage.setItem(STORAGE_KEY_AUTO_UPDATE, 'true');
+          rawAuto = 'true';
+        }
         if (rawAuto !== 'true') return;
 
         const rawBeta = await AsyncStorage.getItem(STORAGE_KEY_BETA_CHANNEL);

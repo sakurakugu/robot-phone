@@ -67,7 +67,7 @@ export class RobotClient {
 
       return data;
     } catch (e: any) {
-      console.error(`Robot API Error [${path}]:`, e);
+      console.error(`机器人API错误 [${path}]:`, e);
       throw e;
     }
   }

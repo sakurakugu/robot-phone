@@ -1,5 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { getApiBaseUrl } from '../../shared/config/environment';
 
 const TOKEN_KEY = '@robot:auth_token';
@@ -39,7 +46,10 @@ export function getAuthToken(): string {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function requestAuth(path: string, body: { username: string; password: string }) {
+async function requestAuth(
+  path: string,
+  body: { username: string; password: string },
+) {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: 'POST',
     headers: {
@@ -67,20 +77,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrapped: false,
   });
 
-  const persist = async (next: { mode: 'guest' | 'authenticated'; user: AuthUser | null; token: string }) => {
-    currentToken = next.token;
-    await AsyncStorage.multiSet([
-      [MODE_KEY, next.mode],
-      [USER_KEY, next.user ? JSON.stringify(next.user) : ''],
-      [TOKEN_KEY, next.token],
-    ]);
-    setState((prev) => ({ ...prev, ...next }));
-  };
+  const persist = useCallback(
+    async (next: {
+      mode: 'guest' | 'authenticated';
+      user: AuthUser | null;
+      token: string;
+    }) => {
+      currentToken = next.token;
+      await AsyncStorage.multiSet([
+        [MODE_KEY, next.mode],
+        [USER_KEY, next.user ? JSON.stringify(next.user) : ''],
+        [TOKEN_KEY, next.token],
+      ]);
+      setState(prev => ({ ...prev, ...next }));
+    },
+    [],
+  );
 
   useEffect(() => {
     (async () => {
-      const [mode, userRaw, token] = await AsyncStorage.multiGet([MODE_KEY, USER_KEY, TOKEN_KEY]);
-      const modeValue = (mode[1] as 'guest' | 'authenticated' | null) || 'guest';
+      const [mode, userRaw, token] = await AsyncStorage.multiGet([
+        MODE_KEY,
+        USER_KEY,
+        TOKEN_KEY,
+      ]);
+      const modeValue =
+        (mode[1] as 'guest' | 'authenticated' | null) || 'guest';
       const tokenValue = token[1] || '';
       let userValue: AuthUser | null = null;
       if (userRaw[1]) {
@@ -100,17 +122,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const data = await requestAuth('/auth/login', { username, password });
-    await persist({ mode: 'authenticated', user: data.user, token: data.token });
-  };
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const data = await requestAuth('/auth/login', { username, password });
+      await persist({
+        mode: 'authenticated',
+        user: data.user,
+        token: data.token,
+      });
+    },
+    [persist],
+  );
 
-  const register = async (username: string, password: string) => {
-    const data = await requestAuth('/auth/register', { username, password });
-    await persist({ mode: 'authenticated', user: data.user, token: data.token });
-  };
+  const register = useCallback(
+    async (username: string, password: string) => {
+      const data = await requestAuth('/auth/register', { username, password });
+      await persist({
+        mode: 'authenticated',
+        user: data.user,
+        token: data.token,
+      });
+    },
+    [persist],
+  );
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       if (currentToken) {
         await fetch(`${getApiBaseUrl()}/auth/logout`, {
@@ -126,11 +162,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     await persist({ mode: 'guest', user: null, token: '' });
-  };
+  }, [persist]);
 
-  const enterGuestMode = async () => {
+  const enterGuestMode = useCallback(async () => {
     await persist({ mode: 'guest', user: null, token: '' });
-  };
+  }, [persist]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -140,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       enterGuestMode,
     }),
-    [state],
+    [state, login, register, logout, enterGuestMode],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -175,7 +175,12 @@ export function SettingsScreen() {
         AsyncStorage.getItem(STORAGE_KEY_AUTO_UPDATE),
         AsyncStorage.getItem(STORAGE_KEY_BETA_CHANNEL),
       ]);
-      if (rawAuto === 'true') setAutoUpdate(true);
+      let autoValue = rawAuto;
+      if (!__DEV__ && rawAuto === null) {
+        await AsyncStorage.setItem(STORAGE_KEY_AUTO_UPDATE, 'true');
+        autoValue = 'true';
+      }
+      if (autoValue === 'true') setAutoUpdate(true);
       if (rawBeta === 'true') setBetaChannel(true);
     })();
   }, []);
@@ -198,6 +203,9 @@ export function SettingsScreen() {
 
   // 自动检查更新（进入设置页时，如果开启了自动更新）
   useEffect(() => {
+    if (__DEV__) {
+      return;
+    }
     if (autoUpdate) {
       doCheckUpdate(true);
     }
