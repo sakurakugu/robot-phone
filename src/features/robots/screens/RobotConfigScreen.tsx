@@ -36,18 +36,13 @@ type ConfigField = {
   type: 'string' | 'int' | 'float' | 'bool' | 'list';
   readonly: boolean;
   default: any;
+  options?: string[] | null;
 };
 
 type ConfigSection = {
   section: string;
   title: string;
   keys: string[];
-};
-
-// 特定字段的可选项
-const FIELD_OPTIONS: Record<string, string[]> = {
-  'logging.level': ['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-  'actions.exit_behavior': ['lie_down', 'stand_up', 'stop'],
 };
 
 // ── 弹窗选择器 ──
@@ -197,7 +192,7 @@ export function RobotConfigScreen() {
     if (robotIp) {
       const c = new RobotClient(robotIp);
       setClient(c);
-      c.login().catch(() => { });
+      c.login().catch(() => {});
     }
   }, [robotIp]);
 
@@ -336,7 +331,7 @@ export function RobotConfigScreen() {
   const renderConfigField = (field: ConfigField, isLast: boolean) => {
     const sectionData = configData[field.section] || {};
     const value = sectionData[field.key] ?? field.default;
-    const options = FIELD_OPTIONS[field.full_key];
+    const options = field.options;
 
     if (field.readonly) {
       return (
@@ -372,7 +367,7 @@ export function RobotConfigScreen() {
       );
     }
 
-    if (options) {
+    if (options && options.length) {
       return (
         <React.Fragment key={field.full_key}>
           <Pressable
@@ -418,9 +413,9 @@ export function RobotConfigScreen() {
     : null;
   const selectModalCurrent = selectModalField
     ? String(
-      (configData[selectModalField.section] || {})[selectModalField.key] ??
-      '',
-    )
+        (configData[selectModalField.section] || {})[selectModalField.key] ??
+          '',
+      )
     : '';
 
   return (

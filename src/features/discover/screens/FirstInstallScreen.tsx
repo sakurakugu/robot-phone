@@ -72,7 +72,7 @@ const PACKAGE_LIST: PackageSpec[] = [
 export function FirstInstallScreen() {
   const palette = usePalette();
   const [config, setConfig] = useState<SshConfig>({
-    host: '192.168.234.1',
+    host: '',
     port: '22',
     user: 'firefly',
     password: 'firefly',
@@ -370,15 +370,24 @@ export function FirstInstallScreen() {
         `清理压缩包 (${pkg.title})`,
         `rm -f ${remoteArchive}`,
       );
+      if (
+        !(await executeAndLog(
+          `安装依赖 (${pkg.title})`,
+          `python3 -m pip install ${remoteDir}`,
+          180,
+        ))
+      ) {
+        return false;
+      }
       await executeAndLog(
         `赋权脚本 (${pkg.title})`,
-        `chmod +x ${remoteDir}/scripts/start.sh`,
+        `chmod +x ${remoteDir}/scripts/install.sh`,
       );
-      await executeAndLog(
-        `赋权脚本 (${pkg.title})`,
-        `chmod +x ${remoteDir}/scripts/stop.sh`,
+      return executeAndLog(
+        `运行安装脚本 (${pkg.title})`,
+        `sudo bash ${remoteDir}/scripts/install.sh`,
+        180,
       );
-      return true;
     },
     [config.user, executeAndLog, getPackageBase64, uploadViaSftp],
   );
