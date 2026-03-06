@@ -14,9 +14,9 @@ import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
 import {
   deleteRobot,
-  fetchRobotGroups,
-  fetchRobots,
+  fetchRobotsLocal,
   syncDiscoveredRobots,
+  syncRobotsWithServer,
 } from '../api';
 import { RobotCard } from '../components/RobotCard';
 import { useMdnsDiscovery } from '../hooks/useMdnsDiscovery';
@@ -36,17 +36,35 @@ export function RobotManagementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>('');
 
+  /** 从本地列表推导分组 */
+  function deriveGroups(robotList: Robot[]): string[] {
+    const set = new Set<string>();
+    for (const r of robotList) {
+      if (r.group_name) set.add(r.group_name);
+    }
+    return Array.from(set);
+  }
+
   const loadData = useCallback(async () => {
     try {
-      setRefreshing(true);
       setError('');
-      const [robotList, groupList] = await Promise.all([
-        fetchRobots(),
-        fetchRobotGroups(),
-      ]);
-      setRobots(robotList);
-      setGroups(groupList);
-      return robotList;
+
+      // 第一阶段：立即读取本地数据，快速渲染
+      const localList = await fetchRobotsLocal();
+      setRobots(localList);
+      setGroups(deriveGroups(localList));
+
+      // 第二阶段：后台拉取服务器数据，合并后更新
+      setRefreshing(true);
+      try {
+        const mergedList = await syncRobotsWithServer();
+        setRobots(mergedList);
+        setGroups(deriveGroups(mergedList));
+        return mergedList;
+      } catch {
+        // 服务器不可达时，保持本地数据展示，不报错
+        return localList;
+      }
     } catch (e: any) {
       setError(e.message || '加载失败');
       return [];

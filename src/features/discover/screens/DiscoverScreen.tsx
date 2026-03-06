@@ -24,6 +24,13 @@ const ALL_DISCOVER_ITEMS: NavItem[] = [
     route: 'SSH 终端',
     adminOnly: false,
   },
+  {
+    id: 'first-install',
+    title: '首次安装机器狗软件',
+    desc: '通过 SSH 安装机器人基础服务',
+    route: '首次安装机器狗软件',
+    adminOnly: false,
+  },
   { id: 'd1', title: '新能力中心', desc: '后续接入插件与技能商店' },
   { id: 'd2', title: '任务模板', desc: '快速创建巡检/守卫任务' },
   { id: 'd3', title: '场景联动', desc: '机器人 + 设备自动化' },

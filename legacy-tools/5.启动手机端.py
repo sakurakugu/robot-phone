@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import importlib.util
 import os
-import subprocess
 import re
+import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -460,11 +462,60 @@ def _修复hermes_win64() -> None:
         print(f"   {win64_dir}")
 
 
+def _执行机器人套件打包() -> tuple[str, str, list[Path]]:
+    tool_path = ROOT / "tools" / "2.配置机器狗.py"
+    spec = importlib.util.spec_from_file_location("robot_dog_packager", tool_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"无法加载打包脚本: {tool_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.执行打包流程(open_explorer=False, require_prompt=False)
+
+
+def _清空目录(target_dir: Path) -> None:
+    if not target_dir.exists():
+        return
+    for item in target_dir.iterdir():
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+
+
+def _拷贝机器人套件到目录(outputs: List[Path], target_dir: Path) -> None:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    _清空目录(target_dir)
+    for output in outputs:
+        shutil.copy2(output, target_dir / output.name)
+
+
+def _准备并放置机器人套件() -> bool:
+    try:
+        _, _, outputs = _执行机器人套件打包()
+    except Exception as e:
+        print(f"❌ 机器人套件打包失败：{e}")
+        return False
+
+    if not outputs:
+        print("❌ 未生成任何机器人套件，停止构建")
+        return False
+
+    android_assets = ROBOT_PHONE / "android" / "app" / "src" / "main" / "assets" / "robot-packages"
+    _拷贝机器人套件到目录(outputs, android_assets)
+
+    ios_resources = ROBOT_PHONE / "ios" / "RobotPhone" / "robot-packages"
+    if ios_resources.parent.exists():
+        _拷贝机器人套件到目录(outputs, ios_resources)
+    return True
+
+
 def build_apk(build_type: str) -> int:
     """
     根据构建类型调用具体的构建函数
     :param build_type: "debug", "release", 或 "unknown"
     """
+    if not _准备并放置机器人套件():
+        return 1
     _修复hermes_win64()
     if build_type == "debug":
         return build_apk_debug()

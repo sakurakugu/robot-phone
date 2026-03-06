@@ -1,16 +1,16 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { createRobot, fetchRobots, syncDiscoveredRobots } from '../api';
+import { createRobot, fetchRobotsLocal, syncDiscoveredRobots } from '../api';
 import { useMdnsDiscovery } from '../hooks/useMdnsDiscovery';
 import type { DiscoveredRobot, Robot } from '../types';
 
@@ -58,7 +58,8 @@ export function AddRobotScreen() {
   const loadExisting = useCallback(async () => {
     try {
       setMessage('');
-      const list = await fetchRobots();
+      // 从本地读取，无需依赖服务器连接
+      const list = await fetchRobotsLocal();
       setRobots(list);
     } catch (e: any) {
       setMessageTone('error');
@@ -122,6 +123,7 @@ export function AddRobotScreen() {
     setAdding(true);
     try {
       await createRobot({
+        uuid: selectedDiscoveredRobot.uuid, // 使用机器人自身的 UUID，与服务器保持一致
         name: selectedDiscoveredRobot.name,
         ip: selectedDiscoveredRobot.ip,
         group_name: groupName || undefined,

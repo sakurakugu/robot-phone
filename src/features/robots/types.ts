@@ -24,6 +24,7 @@ export type Robot = {
 };
 
 export type RobotForm = {
+  uuid?: string; // 本地创建时预分配，避免服务器不可达时生成新 UUID
   name?: string;
   ip?: string;
   group_name?: string;
