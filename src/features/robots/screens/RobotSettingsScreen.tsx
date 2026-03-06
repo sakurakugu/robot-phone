@@ -1,6 +1,12 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Volume, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,16 +15,17 @@ import {
   Text,
   View,
 } from 'react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import ReactNativeBlobUtil from 'react-native-blob-util';
+import { versionCodeToSemver } from '../../settings/services/updateService';
+import type { ActivePackageInfo, PackageType } from '../api';
 import {
   fetchRobot,
-  updateRobot,
   getActivePackage,
   getPackageDownloadUrl,
+  updateRobot,
 } from '../api';
-import type { ActivePackageInfo, PackageType } from '../api';
 import {
   ActionRow,
   InfoRow,
@@ -26,7 +33,6 @@ import {
   Section,
 } from '../components/SettingsComponents';
 import { RobotClient } from '../robotClient';
-import { versionCodeToSemver } from '../../settings/services/updateService';
 import type { RobotForm } from '../types';
 
 type RouteParams = {
@@ -296,7 +302,8 @@ function PackageActionRow({
               ]}
             >
               <Text style={[pkgStyles.actionText, themedStyles.installedText]}>
-                已安装
+                {/* 已安装 */}
+                未实现
               </Text>
             </Pressable>
           ) : (

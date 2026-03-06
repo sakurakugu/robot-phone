@@ -6,10 +6,13 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.module.annotations.ReactModule
 import com.jcraft.jsch.ChannelExec
+import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
+import java.io.ByteArrayInputStream
 import com.sparkrobot.codegen.NativeSparkSshSpec
 import java.io.ByteArrayOutputStream
+import android.util.Base64
 
 /**
  * React Native 原生模块：通过 JSch 实现 SSH 长连接。
@@ -115,6 +118,31 @@ class SshModule(reactContext: ReactApplicationContext) : NativeSparkSshSpec(reac
                 promise.reject("SSH_EXECUTE_ERROR", e.message ?: "命令执行失败")
             } finally {
                 channel?.disconnect()
+            }
+        }.start()
+    }
+
+    @ReactMethod
+    override fun uploadFile(base64: String, remotePath: String, promise: Promise) {
+        Thread {
+            val sess = session
+            if (sess == null || !sess.isConnected) {
+                promise.reject("SSH_NOT_CONNECTED", "未建立 SSH 连接，请先连接")
+                return@Thread
+            }
+            var sftp: ChannelSftp? = null
+            try {
+                val bytes = Base64.decode(base64, Base64.DEFAULT)
+                sftp = sess.openChannel("sftp") as ChannelSftp
+                sftp.connect()
+                sftp.put(ByteArrayInputStream(bytes), remotePath)
+                Log.d(TAG, "SFTP 上传完成: $remotePath (${bytes.size} bytes)")
+                promise.resolve(null)
+            } catch (e: Exception) {
+                Log.e(TAG, "SFTP 上传失败: ${e.message}")
+                promise.reject("SFTP_UPLOAD_ERROR", e.message ?: "上传失败")
+            } finally {
+                sftp?.disconnect()
             }
         }.start()
     }

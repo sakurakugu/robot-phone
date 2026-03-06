@@ -1,4 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
@@ -12,6 +13,7 @@ export function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const themed = useMemo(
@@ -112,14 +114,26 @@ export function AuthScreen() {
           value={username}
           onChangeText={setUsername}
         />
-        <TextInput
-          placeholder="密码（至少6位）"
-          placeholderTextColor={palette.textMuted}
-          style={[styles.input, themed.input]}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={[styles.inputWrap, themed.input]}>
+          <TextInput
+            placeholder="密码（至少6位）"
+            placeholderTextColor={palette.textMuted}
+            style={[styles.inputField, { color: palette.text }]}
+            secureTextEntry={passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable
+            onPress={() => setPasswordVisible(v => !v)}
+            style={styles.eyeBtn}
+          >
+            {passwordVisible ? (
+              <EyeOff color={palette.textMuted} size={16} />
+            ) : (
+              <Eye color={palette.textMuted} size={16} />
+            )}
+          </Pressable>
+        </View>
 
         <Pressable
           style={[styles.btn, themed.btn, loading && styles.btnDisabled]}
@@ -203,6 +217,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  inputWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputField: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  eyeBtn: {
+    paddingLeft: 8,
   },
   btn: {
     borderRadius: 10,

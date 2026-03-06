@@ -637,6 +637,9 @@ def main() -> int:
 
     # 端口检查仅针对启动服务的情况
     if action in {"metro", "ios", "android"}:
+        if not _准备并放置机器人套件():
+            print("❌ 机器人套件准备失败")
+            return 1
         if 检查端口是否被占用(8081):
             print("⚠️  端口 8081 被占用，尝试清理...")
             stop_robot_phone()

@@ -4,9 +4,36 @@
  */
 
 const PORT = 5000;
-const DIR_WAV = '/agibot/data/resources/wav/';
-const DIR_MP4 = '/agibot/data/resources/mp4/';
-const DIR_CSV = '/agibot/data/resources/csv/';
+const RESOURCE_ROOTS = {
+  '0.8': '/agibot/data/resources',
+  '0.9': '/agibot/data/var/robot_proxy/resources',
+} as const;
+export type X2ResourceVersion = keyof typeof RESOURCE_ROOTS;
+let resourceVersion: X2ResourceVersion = '0.8';
+
+export function setX2ResourceVersion(version: X2ResourceVersion): void {
+  resourceVersion = version;
+}
+
+export function getX2ResourceVersion(): X2ResourceVersion {
+  return resourceVersion;
+}
+
+function getResourceRoot(): string {
+  return RESOURCE_ROOTS[resourceVersion];
+}
+
+function getDirWav(): string {
+  return `${getResourceRoot()}/wav/`;
+}
+
+function getDirMp4(): string {
+  return `${getResourceRoot()}/mp4/`;
+}
+
+function getDirCsv(): string {
+  return `${getResourceRoot()}/csv/`;
+}
 
 export interface ActionData {
   /** 动作名称（未使用，保留扩展） */
@@ -46,10 +73,10 @@ async function httpGet(url: string): Promise<void> {
 function sendAudioToDevice(ip: string, data: ActionData): void {
   const params: string[] = [];
   if (data.audioName) {
-    params.push(`audio_path=${DIR_WAV}${data.audioName}.wav`);
+    params.push(`audio_path=${getDirWav()}${data.audioName}.wav`);
   }
   if (data.faceName) {
-    params.push(`emotion_path=${DIR_MP4}${data.faceName}.mp4`);
+    params.push(`emotion_path=${getDirMp4()}${data.faceName}.mp4`);
   }
   if (params.length === 0) return;
   const url = `http://${ip}:${PORT}/lingxi/interaction/play?${params.join('&')}`;
@@ -59,7 +86,7 @@ function sendAudioToDevice(ip: string, data: ActionData): void {
 /** 向单个设备发送 CSV 动作 */
 function sendCSVToDevice(ip: string, data: ActionData): void {
   if (!data.csvName) return;
-  const url = `http://${ip}:${PORT}/lingxi/interaction/play?motion_path=${DIR_CSV}${data.csvName}.csv`;
+  const url = `http://${ip}:${PORT}/lingxi/interaction/play?motion_path=${getDirCsv()}${data.csvName}.csv`;
   httpGet(url);
 }
 
@@ -119,10 +146,17 @@ export function sendLingChuangAction(
  * 对应 SendLingChuangToX2.getMotionData()
  */
 export function buildMotionData(name: string, key: string): MotionData {
+  const act = `linkcraft_resource_onnx_${key}_0.0.1`;
+  const getBase = () =>
+    `${getResourceRoot()}/linkcraft_resource_onnx_${key}/0.0.1/unzip`;
   return {
     name,
-    act: `linkcraft_resource_onnx_${key}_0.0.1`,
-    mp4: `/agibot/data/resources/linkcraft_resource_onnx_${key}/0.0.1/unzip/expression.mp4`,
-    wav: `/agibot/data/resources/linkcraft_resource_onnx_${key}/0.0.1/unzip/audio.wav`,
+    act,
+    get mp4() {
+      return `${getBase()}/expression.mp4`;
+    },
+    get wav() {
+      return `${getBase()}/audio.wav`;
+    },
   };
 }

@@ -50,7 +50,7 @@ export function SshTerminalScreen() {
     user: '',
     password: '',
   });
-  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(true);
 
   const [isConnected, setIsConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -306,20 +306,14 @@ export function SshTerminalScreen() {
               />
               <View style={styles.configRow}>
                 <Text
-                  style={[styles.configLabel, { color: palette.textMuted }]}
+                  style={[
+                    styles.configLabel,
+                    styles.passwordLabel,
+                    { color: palette.textMuted },
+                  ]}
                 >
                   密码
                 </Text>
-                <TextInput
-                  style={[styles.configInput, { color: palette.text }]}
-                  value={config.password}
-                  onChangeText={updateConfig('password')}
-                  secureTextEntry={!passwordVisible}
-                  placeholderTextColor={palette.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isConnected}
-                />
                 <Pressable
                   onPress={() => setPasswordVisible(v => !v)}
                   style={styles.eyeBtn}
@@ -330,8 +324,18 @@ export function SshTerminalScreen() {
                     <Eye color={palette.textMuted} size={16} />
                   )}
                 </Pressable>
+                {/* 密码输入框 */}
+                <TextInput
+                  style={[styles.configInput, { color: palette.text }]}
+                  value={config.password}
+                  onChangeText={updateConfig('password')}
+                  secureTextEntry={passwordVisible}
+                  placeholderTextColor={palette.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isConnected}
+                />
               </View>
-
               <View
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
@@ -593,6 +597,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     width: 52,
   },
+  passwordLabel: {
+    width: 'auto',
+    marginRight: 2,
+  },
   configInput: {
     flex: 1,
     fontSize: 14,
@@ -600,7 +608,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   eyeBtn: {
-    paddingLeft: 8,
+    paddingRight: 8,
     paddingVertical: 4,
   },
   actionRow: {

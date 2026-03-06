@@ -30,6 +30,12 @@ export const SparkSsh = {
     NativeSparkSsh.execute(command, timeoutSeconds),
 
   /**
+   * 通过 SFTP 上传文件（base64 → 远端路径，直接二进制写入，无需中转临时文件）
+   */
+  uploadFile: (base64: string, remotePath: string) =>
+    NativeSparkSsh.uploadFile(base64, remotePath),
+
+  /**
    * 批量执行命令，逐条执行并通过 onProgress 回调实时通知结果
    * 遇到错误不中断，继续执行后续命令
    */

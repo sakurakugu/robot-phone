@@ -37,6 +37,13 @@ export interface Spec extends TurboModule {
    * @param timeoutSeconds 等待超时（秒），建议 30
    */
   execute(command: string, timeoutSeconds: number): Promise<string>;
+
+  /**
+   * 通过 SFTP 将 base64 编码的文件内容上传到远端路径
+   * @param base64 文件内容的 base64 字符串
+   * @param remotePath 远端目标路径（绝对路径）
+   */
+  uploadFile(base64: string, remotePath: string): Promise<void>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('SparkSsh');

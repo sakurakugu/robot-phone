@@ -3,6 +3,7 @@
  * 对应 Android MainActivity
  */
 import { useNavigation } from '@react-navigation/native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,7 +22,12 @@ import { Screen } from '../../../../shared/ui/Screen';
 import { fetchRobots } from '../../api';
 import type { Robot } from '../../types';
 import { useX2Ip } from '../x2/useX2Ip';
-import { sendStop } from '../x2/x2Api';
+import {
+  getX2ResourceVersion,
+  sendStop,
+  setX2ResourceVersion,
+  type X2ResourceVersion,
+} from '../x2/x2Api';
 
 const SCENARIOS = [
   { id: 'normal', label: '简单动作 & 音乐', desc: '常规舞蹈、音频、表情动作' },
@@ -38,6 +44,18 @@ const SCENE_ROUTE: Record<string, string> = {
   taici: 'X2 台词',
   teji: 'X2 特技',
 };
+const RESOURCE_VERSION_OPTIONS: {
+  id: X2ResourceVersion;
+  label: string;
+  path: string;
+}[] = [
+  { id: '0.8', label: '0.8 旧路径', path: '/agibot/data/resources' },
+  {
+    id: '0.9',
+    label: '0.9 新路径',
+    path: '/agibot/data/var/robot_proxy/resources',
+  },
+];
 
 type DeviceItem =
   | { kind: 'server'; robot: Robot; ip: string }
@@ -81,6 +99,21 @@ export function X2ControlScreen() {
       collapseText: { color: palette.primary },
       collapseBorder: { borderTopColor: palette.border },
       selectedHint: { color: palette.textMuted },
+      pathLabel: { color: palette.text },
+      pathToggleColor: { color: palette.textMuted },
+      pathCard: {
+        backgroundColor: palette.surface,
+        borderColor: palette.border,
+      },
+      pathDivider: { backgroundColor: palette.border },
+      pathOptionNormal: {
+        backgroundColor: palette.surface,
+      },
+      pathOptionSelected: {
+        backgroundColor: `${palette.primary}14`,
+      },
+      pathOptionTitle: { color: palette.text },
+      pathOptionSub: { color: palette.textMuted },
       stopBtnActive: { backgroundColor: '#e53935' },
       stopBtnInactive: { backgroundColor: palette.border },
       cardNormal: {
@@ -111,6 +144,10 @@ export function X2ControlScreen() {
   const [addVisible, setAddVisible] = useState(false);
   const [draftIp, setDraftIp] = useState('');
   const [listCollapsed, setListCollapsed] = useState(true);
+  const [resourceVersion, setResourceVersion] = useState<X2ResourceVersion>(
+    getX2ResourceVersion(),
+  );
+  const [pathCollapsed, setPathCollapsed] = useState(true);
 
   const loadServerRobots = useCallback(async () => {
     setLoadingServer(true);
@@ -222,8 +259,13 @@ export function X2ControlScreen() {
     if (route) navigation.navigate(route, { ip: selectedIpStr });
   }
 
+  function handleResourceVersion(version: X2ResourceVersion) {
+    setResourceVersion(version);
+    setX2ResourceVersion(version);
+  }
+
   return (
-    <Screen palette={palette}>
+    <Screen palette={palette} unsafeTop={true}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* ── 设备列表 ── */}
         <View style={styles.sectionHeader}>
@@ -370,6 +412,78 @@ export function X2ControlScreen() {
           已选 {selectedIps.size} 台设备
         </Text>
 
+        <View style={[styles.pathCard, themedStyles.pathCard]}>
+          <Pressable
+            style={styles.pathHeader}
+            onPress={() => setPathCollapsed(v => !v)}
+            hitSlop={8}
+          >
+            <Text style={[styles.pathLabel, themedStyles.pathLabel]}>
+              资源路径
+            </Text>
+            <View style={styles.pathToggleIcon}>
+              {pathCollapsed ? (
+                <ChevronDown
+                  size={18}
+                  color={themedStyles.pathToggleColor.color}
+                />
+              ) : (
+                <ChevronUp
+                  size={18}
+                  color={themedStyles.pathToggleColor.color}
+                />
+              )}
+            </View>
+          </Pressable>
+          {!pathCollapsed && (
+            <>
+              <View style={[styles.pathDivider, themedStyles.pathDivider]} />
+              <View style={styles.pathOptions}>
+                {RESOURCE_VERSION_OPTIONS.map((option, index) => {
+                  const selected = option.id === resourceVersion;
+                  const isLast = index === RESOURCE_VERSION_OPTIONS.length - 1;
+                  return (
+                    <View key={option.id}>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.pathOption,
+                          selected
+                            ? themedStyles.pathOptionSelected
+                            : themedStyles.pathOptionNormal,
+                          pressed && styles.pathOptionPressed,
+                        ]}
+                        onPress={() => handleResourceVersion(option.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.pathOptionTitle,
+                            themedStyles.pathOptionTitle,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.pathOptionSub,
+                            themedStyles.pathOptionSub,
+                          ]}
+                        >
+                          {option.path}
+                        </Text>
+                      </Pressable>
+                      {!isLast && (
+                        <View
+                          style={[styles.pathDivider, themedStyles.pathDivider]}
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+        </View>
+
         {/* 停止按钮 */}
         <TouchableOpacity
           style={[
@@ -385,7 +499,11 @@ export function X2ControlScreen() {
 
         {/* 场景列表 */}
         <Text
-          style={[styles.sectionTitle, styles.sectionTitleSpacing, themedStyles.sectionTitle]}
+          style={[
+            styles.sectionTitle,
+            styles.sectionTitleSpacing,
+            themedStyles.sectionTitle,
+          ]}
         >
           场景控制
         </Text>
@@ -526,6 +644,34 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: 'right',
   },
+  pathCard: {
+    marginTop: 6,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  pathHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  pathLabel: { fontSize: 14, fontWeight: '600' },
+  pathToggleIcon: { paddingLeft: 6 },
+  pathOptions: {},
+  pathDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 14,
+  },
+  pathOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pathOptionPressed: { opacity: 0.9 },
+  pathOptionTitle: { fontSize: 14, fontWeight: '600' },
+  pathOptionSub: { fontSize: 12, marginTop: 4 },
   stopBtn: { marginTop: 4, padding: 12, borderRadius: 8, alignItems: 'center' },
   stopBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   scenarioList: { gap: 10 },

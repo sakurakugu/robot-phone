@@ -8,7 +8,7 @@ const groupControls = [
   {
     id: 'x2',
     title: 'X2 机器人群控',
-    desc: '适用于 X2 机型的多机协同控制',
+    desc: '适用于 X2 机型的多机协同控制 (未测试)',
     route: 'X2 机器人控制',
   },
   {
