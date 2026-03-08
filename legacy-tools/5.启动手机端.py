@@ -23,6 +23,7 @@ from scripts.start.utils import (
     检查运行环境,
     pkill_patterns,
     kill_port,
+    持续监控直到中断,
 )
 
 ROBOT_PHONE = ROOT / "app" / "robot-phone" / "RobotPhone"
@@ -308,30 +309,35 @@ def _get_custom_build_dir(android_dir: Path) -> Optional[Path]:
     return None
 
 
-def build_apk_debug() -> int:
+def _打开目录(target_dir: Path) -> None:
+    if os.name == "nt":
+        os.startfile(target_dir)
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(target_dir)])
+    else:
+        subprocess.run(["xdg-open", str(target_dir)])
+
+
+def _构建并处理apk(variant: str, gradle_task: str) -> int:
     android_dir = ROBOT_PHONE / "android"
     gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
     if not gradlew.exists():
         print(f"❌ 未找到 gradlew: {gradlew}")
         return 1
-    print("🔨 开始构建 Android Debug APK...")
+    print(f"🔨 开始构建 Android {variant.capitalize()} APK...")
     result = subprocess.run(
-        [str(gradlew), "assembleDebug"],
+        [str(gradlew), gradle_task],
         cwd=android_dir,
     )
     if result.returncode != 0:
         print("❌ 构建失败")
         return result.returncode
 
-    # 尝试查找构建产物
-    # 1. 默认路径
-    apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / "debug"
-
-    # 2. 自定义 buildDir 路径 (从 build.gradle 解析)
+    apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / variant
     apk_dir_custom = None
     custom_build_root = _get_custom_build_dir(android_dir)
     if custom_build_root:
-        apk_dir_custom = custom_build_root / "outputs" / "apk" / "debug"
+        apk_dir_custom = custom_build_root / "outputs" / "apk" / variant
 
     apk_dir = None
     if apk_dir_default.exists():
@@ -344,14 +350,8 @@ def build_apk_debug() -> int:
         if apks:
             size_mb = round(apks[0].stat().st_size / 1024 / 1024, 2)
             print(f"✅ 构建成功！APK 路径：{apks[0]}  [{size_mb} MB]")
-            # 自动打开文件夹
             print(f"📂 正在打开输出目录：{apk_dir}")
-            if os.name == "nt":
-                os.startfile(apk_dir)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", str(apk_dir)])
-            else:
-                subprocess.run(["xdg-open", str(apk_dir)])
+            _打开目录(apk_dir)
         else:
             print(f"✅ 构建成功！但在 {apk_dir} 未找到 APK 文件。")
     else:
@@ -359,55 +359,12 @@ def build_apk_debug() -> int:
     return 0
 
 
+def build_apk_debug() -> int:
+    return _构建并处理apk("debug", "assembleDebug")
+
+
 def build_apk_release() -> int:
-    android_dir = ROBOT_PHONE / "android"
-    gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
-    if not gradlew.exists():
-        print(f"❌ 未找到 gradlew: {gradlew}")
-        return 1
-    print("🔨 开始构建 Android Release APK...")
-    result = subprocess.run(
-        [str(gradlew), "assembleRelease"],
-        cwd=android_dir,
-    )
-    if result.returncode != 0:
-        print("❌ 构建失败")
-        return result.returncode
-
-    # 尝试查找构建产物
-    # 1. 默认路径
-    apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / "release"
-
-    # 2. 自定义 buildDir 路径 (从 build.gradle 解析)
-    apk_dir_custom = None
-    custom_build_root = _get_custom_build_dir(android_dir)
-    if custom_build_root:
-        apk_dir_custom = custom_build_root / "outputs" / "apk" / "release"
-
-    apk_dir = None
-    if apk_dir_default.exists():
-        apk_dir = apk_dir_default
-    elif apk_dir_custom and apk_dir_custom.exists():
-        apk_dir = apk_dir_custom
-
-    if apk_dir and apk_dir.exists():
-        apks = list(apk_dir.glob("*.apk"))
-        if apks:
-            size_mb = round(apks[0].stat().st_size / 1024 / 1024, 2)
-            print(f"✅ 构建成功！APK 路径：{apks[0]}  [{size_mb} MB]")
-             # 自动打开文件夹
-            print(f"📂 正在打开输出目录：{apk_dir}")
-            if os.name == "nt":
-                os.startfile(apk_dir)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", str(apk_dir)])
-            else:
-                subprocess.run(["xdg-open", str(apk_dir)])
-        else:
-             print(f"✅ 构建成功！但在 {apk_dir} 未找到 APK 文件。")
-    else:
-        print(f"✅ 构建成功！(未找到 APK 输出目录，检查过: {apk_dir_default} 和 {apk_dir_custom})")
-    return 0
+    return _构建并处理apk("release", "assembleRelease")
 
 
 def _修复hermes_win64() -> None:
@@ -593,20 +550,6 @@ def _pick_android_device() -> str:
     return ""
 
 
-def monitor(pids: List[Tuple[str, int]]) -> int:
-    print("")
-    print("========================================")
-    print("  ✅ 手机端启动完成，开始监控进程")
-    print("========================================")
-    print("按 Ctrl+C 停止所有服务")
-    try:
-        while True:
-            time.sleep(1.0)
-    except KeyboardInterrupt:
-        print("\n正在停止服务...")
-        return 130
-
-
 def main() -> int:
     print("\033]0;手机端\007")
     ns = parse_args()
@@ -656,14 +599,14 @@ def main() -> int:
 
     # 启动服务逻辑
     if action == "metro":
-        pids = start_metro()
+        start_metro()
     elif action == "ios":
-        pids = start_ios()
+        start_ios()
     else:
         # 默认 android 或 restart 后的默认动作
-        pids = start_android()
+        start_android()
 
-    rc = monitor(pids)
+    rc = 持续监控直到中断("手机端启动完成，开始监控进程")
     try:
         stop_robot_phone()
     except KeyboardInterrupt:

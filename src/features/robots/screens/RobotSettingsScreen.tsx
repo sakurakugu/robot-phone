@@ -1,22 +1,10 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Volume, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { usePalette } from '../../../app/theme/palette';
+import { SparkSsh } from '../../../shared/native/SparkSsh';
 import { Screen } from '../../../shared/ui/Screen';
 import { versionCodeToSemver } from '../../settings/services/updateService';
 import type { ActivePackageInfo, PackageType } from '../api';
@@ -33,6 +21,11 @@ import {
   Section,
 } from '../components/SettingsComponents';
 import { RobotClient } from '../robotClient';
+import {
+  installPackageFromBase64,
+  PACKAGE_INSTALL_ORDER,
+  PACKAGE_INSTALL_SPECS,
+} from '../services/robotPackageInstallService';
 import type { RobotForm } from '../types';
 
 type RouteParams = {
@@ -189,146 +182,6 @@ function splitTags(input: string): string[] {
     .filter(Boolean);
 }
 
-type PackageActionRowProps = {
-  type: PackageType;
-  hasPkg: boolean;
-  downloaded: boolean;
-  uploaded: boolean;
-  installed: boolean;
-  status?: 'downloading' | 'uploading';
-  isLast: boolean;
-  onDownload: () => void;
-  onUpload: () => void;
-  onInstall: () => void;
-};
-
-function PackageActionRow({
-  type,
-  hasPkg,
-  downloaded,
-  uploaded,
-  installed,
-  status,
-  isLast,
-  onDownload,
-  onUpload,
-  onInstall,
-}: PackageActionRowProps) {
-  const palette = usePalette();
-  const themedStyles = useMemo(
-    () => ({
-      row: { backgroundColor: palette.surface },
-      label: { color: palette.text },
-      subtitle: { color: palette.textMuted },
-      divider: { backgroundColor: palette.border },
-      downloadText: { color: palette.primary },
-      uploadText: { color: palette.success },
-      downloadBorder: { borderColor: palette.primary },
-      uploadBorder: { borderColor: palette.success },
-      installText: { color: palette.textMuted },
-      installBorder: { borderColor: palette.textMuted },
-      installedText: { color: palette.textMuted },
-      installedBorder: { borderColor: palette.textMuted },
-      pressed: { backgroundColor: palette.surfaceAlt },
-    }),
-    [palette],
-  );
-  const downloading = status === 'downloading';
-  const uploading = status === 'uploading';
-  const downloadDisabled = !hasPkg || downloading || uploading;
-  const uploadDisabled = !downloaded || uploading || downloading;
-  const installDisabled = !uploaded || downloading || uploading;
-  const downloadLabel = downloaded ? '已下载' : '下载到手机';
-  const uploadLabel = uploaded ? '已上传' : '上传到机器人';
-  const subtitle = downloaded
-    ? '已下载，可重新下载'
-    : hasPkg
-      ? '从云端下载到本机'
-      : '云端暂无此包';
-
-  return (
-    <>
-      <View style={[pkgStyles.row, themedStyles.row]}>
-        <View style={pkgStyles.rowInfo}>
-          <Text style={[pkgStyles.rowLabel, themedStyles.label]}>{type}</Text>
-          <Text style={[pkgStyles.rowSubtitle, themedStyles.subtitle]}>
-            {subtitle}
-          </Text>
-        </View>
-        <View style={pkgStyles.rowActions}>
-          <Pressable
-            style={({ pressed }) => [
-              pkgStyles.actionBtn,
-              themedStyles.downloadBorder,
-              pressed && themedStyles.pressed,
-              downloadDisabled && pkgStyles.actionDisabled,
-            ]}
-            onPress={downloadDisabled ? undefined : onDownload}
-          >
-            {downloading ? (
-              <ActivityIndicator size="small" color={palette.primary} />
-            ) : (
-              <Text style={[pkgStyles.actionText, themedStyles.downloadText]}>
-                {downloadLabel}
-              </Text>
-            )}
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              pkgStyles.actionBtn,
-              pkgStyles.actionBtnGap,
-              themedStyles.uploadBorder,
-              pressed && themedStyles.pressed,
-              uploadDisabled && pkgStyles.actionDisabled,
-            ]}
-            onPress={uploadDisabled ? undefined : onUpload}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color={palette.success} />
-            ) : (
-              <Text style={[pkgStyles.actionText, themedStyles.uploadText]}>
-                {uploadLabel}
-              </Text>
-            )}
-          </Pressable>
-          {installed ? (
-            <Pressable
-              style={({ pressed }) => [
-                pkgStyles.actionBtn,
-                pkgStyles.actionBtnGap,
-                themedStyles.installedBorder,
-                pressed && themedStyles.pressed,
-                pkgStyles.actionDisabled,
-              ]}
-            >
-              <Text style={[pkgStyles.actionText, themedStyles.installedText]}>
-                {/* 已安装 */}
-                未实现
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              style={({ pressed }) => [
-                pkgStyles.actionBtn,
-                pkgStyles.actionBtnGap,
-                themedStyles.installBorder,
-                pressed && themedStyles.pressed,
-                installDisabled && pkgStyles.actionDisabled,
-              ]}
-              onPress={installDisabled ? undefined : onInstall}
-            >
-              <Text style={[pkgStyles.actionText, themedStyles.installText]}>
-                安装
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-      {!isLast && <View style={[pkgStyles.divider, themedStyles.divider]} />}
-    </>
-  );
-}
-
 // --- 主屏幕 ---
 
 export function RobotSettingsScreen() {
@@ -344,18 +197,16 @@ export function RobotSettingsScreen() {
   const [activePackage, setActivePackage] = useState<ActivePackageInfo | null>(
     null,
   );
-  const [downloadedPaths, setDownloadedPaths] = useState<
+  const [downloadingPackages, setDownloadingPackages] = useState(false);
+  const [installingPackages, setInstallingPackages] = useState(false);
+  const [installProgress, setInstallProgress] = useState('');
+  const [downloadedPackagePaths, setDownloadedPackagePaths] = useState<
     Partial<Record<PackageType, string>>
   >({});
-  const [uploadedFlags, setUploadedFlags] = useState<
-    Partial<Record<PackageType, boolean>>
-  >({});
-  const [installedFlags, setInstalledFlags] = useState<
-    Partial<Record<PackageType, boolean>>
-  >({});
-  const [pkgStatus, setPkgStatus] = useState<
-    Partial<Record<PackageType, 'downloading' | 'uploading'>>
-  >({});
+  const [downloadedVersion, setDownloadedVersion] = useState<string | null>(
+    null,
+  );
+  const [installedVersion, setInstalledVersion] = useState<string | null>(null);
 
   // 客户端状态
   const [client, setClient] = useState<RobotClient | null>(null);
@@ -437,6 +288,12 @@ export function RobotSettingsScreen() {
     loadRobot();
   }, [loadRobot]);
 
+  useEffect(() => {
+    setDownloadedPackagePaths({});
+    setDownloadedVersion(null);
+    setInstalledVersion(null);
+  }, [activePackage?.versionCode]);
+
   async function handleSaveBasic() {
     const payload: RobotForm = {
       name: name || undefined,
@@ -482,51 +339,177 @@ export function RobotSettingsScreen() {
     });
   };
 
-  const handleDownloadPackage = async (type: PackageType) => {
-    const pkg = activePackage?.[type];
-    if (!pkg) return;
-    setPkgStatus(prev => ({ ...prev, [type]: 'downloading' }));
-    setMessage('');
-    try {
-      const url = getPackageDownloadUrl(type);
-      const destPath = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${type}.tar.gz`;
-      // 若已存在则先删除
+  const downloadPackageToTemp = useCallback(
+    async (type: PackageType) => {
+      const pkg = activePackage?.[type];
+      if (!pkg) {
+        throw new Error(`${type} 安装包不存在`);
+      }
+      const spec = PACKAGE_INSTALL_SPECS[type];
+      const tmpDir = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/tmp`;
+      if (!(await ReactNativeBlobUtil.fs.exists(tmpDir))) {
+        await ReactNativeBlobUtil.fs.mkdir(tmpDir);
+      }
+      const destPath = `${tmpDir}/${spec.archiveName}`;
       if (await ReactNativeBlobUtil.fs.exists(destPath)) {
         await ReactNativeBlobUtil.fs.unlink(destPath);
       }
+      const url = getPackageDownloadUrl(type);
       const res = await ReactNativeBlobUtil.config({
         path: destPath,
         fileCache: false,
       }).fetch('GET', url);
       if (res.info().status !== 200) {
-        throw new Error(`下载失败，状态码: ${res.info().status}`);
+        throw new Error(`${spec.title} 下载失败，状态码: ${res.info().status}`);
       }
-      setDownloadedPaths(prev => ({ ...prev, [type]: destPath }));
-      setUploadedFlags(prev => ({ ...prev, [type]: false }));
-      setInstalledFlags(prev => ({ ...prev, [type]: false }));
-      setMessage(`${type} 安装包已下载到手机`);
+      return destPath;
+    },
+    [activePackage],
+  );
+
+  const executeSshAndThrow = useCallback(
+    async (title: string, command: string) => {
+      try {
+        await SparkSsh.execute(command, 180);
+      } catch (e: any) {
+        throw new Error(`${title}失败: ${e.message || String(e)}`);
+      }
+    },
+    [],
+  );
+
+  const uploadSshAndThrow = useCallback(
+    async (remotePath: string, base64: string, label: string) => {
+      try {
+        await SparkSsh.uploadFile(base64, remotePath);
+      } catch (e: any) {
+        throw new Error(`上传 ${label} 失败: ${e.message || String(e)}`);
+      }
+    },
+    [],
+  );
+
+  const installSinglePackage = useCallback(
+    async (type: PackageType, localPath: string) => {
+      const spec = PACKAGE_INSTALL_SPECS[type];
+      const base64 = await ReactNativeBlobUtil.fs.readFile(localPath, 'base64');
+      await installPackageFromBase64({
+        type,
+        user: 'firefly',
+        archiveBase64: base64,
+        archiveFileName: spec.archiveName,
+        runRemoteCommand: executeSshAndThrow,
+        uploadRemoteFile: uploadSshAndThrow,
+        onProgress: setInstallProgress,
+      });
+    },
+    [executeSshAndThrow, uploadSshAndThrow],
+  );
+
+  const handleInstallAllPackages = useCallback(async () => {
+    if (installingPackages || downloadingPackages) return;
+    if (!ip) {
+      setMessage('IP 未设置，无法安装');
+      return;
+    }
+    if (!activePackage) {
+      setMessage('暂无可用安装包');
+      return;
+    }
+    for (const type of PACKAGE_INSTALL_ORDER) {
+      if (!activePackage[type]) {
+        setMessage(`${type} 安装包不存在，无法一次性安装`);
+        return;
+      }
+      const localPath = downloadedPackagePaths[type];
+      if (!localPath || !(await ReactNativeBlobUtil.fs.exists(localPath))) {
+        setMessage('请先下载全部安装包');
+        return;
+      }
+    }
+
+    setInstallingPackages(true);
+    setMessage('');
+    setInstallProgress('连接机器人');
+    try {
+      if (!SparkSsh.isConnected()) {
+        await SparkSsh.connect(ip, 22, 'firefly', 'firefly');
+      }
+      for (const type of PACKAGE_INSTALL_ORDER) {
+        const spec = PACKAGE_INSTALL_SPECS[type];
+        const localPath = downloadedPackagePaths[type]!;
+        setInstallProgress(`安装 ${spec.title}`);
+        await installSinglePackage(type, localPath);
+      }
+      setInstallProgress('');
+      const currentVersion = activePackage
+        ? `v${versionCodeToSemver(activePackage.versionCode)}`
+        : null;
+      setInstalledVersion(currentVersion);
+      setMessage('全部安装完成');
+    } catch (e: any) {
+      setMessage(e.message || '安装失败');
+    } finally {
+      setInstallingPackages(false);
+    }
+  }, [
+    activePackage,
+    downloadedPackagePaths,
+    downloadingPackages,
+    installSinglePackage,
+    installingPackages,
+    ip,
+  ]);
+
+  const handleDownloadAllPackages = useCallback(async () => {
+    if (downloadingPackages || installingPackages) return;
+    if (!activePackage) {
+      setMessage('暂无可用安装包');
+      return;
+    }
+    for (const type of PACKAGE_INSTALL_ORDER) {
+      if (!activePackage[type]) {
+        setMessage(`${type} 安装包不存在，无法一次性下载`);
+        return;
+      }
+    }
+
+    setDownloadingPackages(true);
+    setMessage('');
+    try {
+      const nextDownloadedPaths: Partial<Record<PackageType, string>> = {};
+      for (const type of PACKAGE_INSTALL_ORDER) {
+        const spec = PACKAGE_INSTALL_SPECS[type];
+        setInstallProgress(`下载 ${spec.title}`);
+        nextDownloadedPaths[type] = await downloadPackageToTemp(type);
+      }
+      setDownloadedPackagePaths(nextDownloadedPaths);
+      const currentVersion = activePackage
+        ? `v${versionCodeToSemver(activePackage.versionCode)}`
+        : null;
+      setDownloadedVersion(currentVersion);
+      setInstalledVersion(null);
+      setInstallProgress('');
+      setMessage('全部安装包下载完成');
     } catch (e: any) {
       setMessage(e.message || '下载失败');
     } finally {
-      setPkgStatus(prev => ({ ...prev, [type]: undefined }));
+      setDownloadingPackages(false);
     }
-  };
+  }, [
+    activePackage,
+    downloadPackageToTemp,
+    downloadingPackages,
+    installingPackages,
+  ]);
 
-  const handleUploadPackage = async (type: PackageType) => {
-    const filePath = downloadedPaths[type];
-    if (!client || !filePath) return;
-    setPkgStatus(prev => ({ ...prev, [type]: 'uploading' }));
-    setMessage('');
-    try {
-      await client.uploadPackage(type, filePath);
-      setUploadedFlags(prev => ({ ...prev, [type]: true }));
-      setMessage(`${type} 安装包已上传到机器人`);
-    } catch (e: any) {
-      setMessage(e.message || '上传失败');
-    } finally {
-      setPkgStatus(prev => ({ ...prev, [type]: undefined }));
-    }
-  };
+  const currentVersion = activePackage
+    ? `v${versionCodeToSemver(activePackage.versionCode)}`
+    : null;
+  const isCurrentDownloaded =
+    !!currentVersion && downloadedVersion === currentVersion;
+  const isCurrentInstalled =
+    !!currentVersion && installedVersion === currentVersion;
 
   return (
     <Screen palette={palette} unsafeTop={true}>
@@ -647,33 +630,68 @@ export function RobotSettingsScreen() {
               ) : (
                 <InfoRow label="云端版本" value="暂无可用安装包" />
               )}
-              {(['common', 'server', 'agent'] as PackageType[]).map(
-                (type, idx, arr) => {
-                  const hasPkg = !!activePackage?.[type];
-                  const isLast = idx === arr.length - 1;
-                  const status = pkgStatus[type];
-                  const downloaded = !!downloadedPaths[type];
-                  const uploaded = !!uploadedFlags[type];
-                  const installed = !!installedFlags[type];
-                  return (
-                    <PackageActionRow
-                      key={type}
-                      type={type}
-                      hasPkg={hasPkg}
-                      downloaded={downloaded}
-                      uploaded={uploaded}
-                      installed={installed}
-                      status={status}
-                      onDownload={() => handleDownloadPackage(type)}
-                      onUpload={() => handleUploadPackage(type)}
-                      onInstall={() =>
-                        setInstalledFlags(prev => ({ ...prev, [type]: true }))
-                      }
-                      isLast={isLast}
-                    />
-                  );
-                },
-              )}
+              <InfoRow label="安装顺序" value="common ➡ server ➡ agent" />
+              {installProgress ? (
+                <InfoRow label="安装进度" value={installProgress} />
+              ) : null}
+              <View style={styles.installActionRow}>
+                <Pressable
+                  style={[
+                    styles.installActionButton,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: palette.surface,
+                    },
+                    (downloadingPackages || installingPackages) &&
+                      styles.installActionButtonDisabled,
+                  ]}
+                  onPress={
+                    downloadingPackages || installingPackages
+                      ? undefined
+                      : handleDownloadAllPackages
+                  }
+                >
+                  <Text
+                    style={[styles.installActionText, { color: palette.text }]}
+                  >
+                    {downloadingPackages
+                      ? '下载中...'
+                      : isCurrentDownloaded
+                        ? `已下载(${currentVersion})`
+                        : '下载安装包'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.installActionButton,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: palette.surface,
+                    },
+                    (!isCurrentDownloaded ||
+                      downloadingPackages ||
+                      installingPackages) &&
+                      styles.installActionButtonDisabled,
+                  ]}
+                  onPress={
+                    !isCurrentDownloaded ||
+                    downloadingPackages ||
+                    installingPackages
+                      ? undefined
+                      : handleInstallAllPackages
+                  }
+                >
+                  <Text
+                    style={[styles.installActionText, { color: palette.text }]}
+                  >
+                    {installingPackages
+                      ? '安装中...'
+                      : isCurrentInstalled
+                        ? '已全部安装'
+                        : '上传并安装'}
+                  </Text>
+                </Pressable>
+              </View>
             </Section>
           </>
         ) : (
@@ -708,54 +726,26 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-});
-
-const pkgStyles = StyleSheet.create({
-  row: {
+  installActionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 48,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  rowInfo: {
+  installActionButton: {
     flex: 1,
-  },
-  rowLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  rowSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  rowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
-  },
-  actionBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    minHeight: 42,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  actionBtnGap: {
-    marginLeft: 8,
-    marginTop: 6,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actionDisabled: {
+  installActionButtonDisabled: {
     opacity: 0.5,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16,
+  installActionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

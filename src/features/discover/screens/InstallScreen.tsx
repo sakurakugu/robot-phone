@@ -15,11 +15,17 @@ import { usePalette } from '../../../app/theme/palette';
 import { SparkSsh } from '../../../shared/native/SparkSsh';
 import { Screen } from '../../../shared/ui/Screen';
 import { Toast } from '../../../shared/ui/Toast';
+import type { PackageType } from '../../robots/api';
 import {
   ActionRow,
   InfoRow,
   InputRow,
 } from '../../robots/components/SettingsComponents';
+import {
+  installPackageFromBase64,
+  PACKAGE_INSTALL_ORDER,
+  PACKAGE_INSTALL_SPECS,
+} from '../../robots/services/robotPackageInstallService';
 
 type SshConfig = {
   host: string;
@@ -35,39 +41,11 @@ type LogEntry = {
   isError: boolean;
 };
 
-type PackageSpec = {
-  key: 'common' | 'server' | 'agent';
-  name: string;
-  fileName: string;
-  title: string;
-};
-
 type PackagePayload = {
   base64: string;
   fileName: string;
   isGzip: boolean;
 };
-
-const PACKAGE_LIST: PackageSpec[] = [
-  {
-    key: 'common',
-    name: 'sparkrobot-common',
-    fileName: 'sparkrobot-common.tar.gz',
-    title: 'SparkRobot Common',
-  },
-  {
-    key: 'server',
-    name: 'robot-server',
-    fileName: 'robot-server.tar.gz',
-    title: 'Robot Server',
-  },
-  {
-    key: 'agent',
-    name: 'robot-agent',
-    fileName: 'robot-agent.tar.gz',
-    title: 'Robot Agent',
-  },
-];
 
 export function FirstInstallScreen() {
   const palette = usePalette();
@@ -208,7 +186,7 @@ export function FirstInstallScreen() {
     [],
   );
 
-  const uploadViaSftp = useCallback(
+  const uploadViaSftpOrThrow = useCallback(
     async (remotePath: string, base64: string, label: string) => {
       setProgress(`上传 ${label}`);
       try {
@@ -218,178 +196,41 @@ export function FirstInstallScreen() {
           output: '上传完成',
           isError: false,
         });
-        return true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         appendLog({ title: `上传失败 (${label})`, output: msg, isError: true });
-        return false;
+        throw new Error(msg);
       }
     },
     [appendLog],
   );
 
-  const installCommon = useCallback(
-    async (pkg: PackageSpec) => {
-      const remoteDir = `/home/${config.user}/sparkrobot/${pkg.name}`;
-      setProgress(`读取 ${pkg.title}`);
-      const payload = await getPackageBase64(pkg.fileName);
-      const remoteArchive = `/tmp/${pkg.name}${payload.isGzip ? '.tar.gz' : '.tar'}`;
-      if (
-        !(await executeAndLog(
-          `创建目录 (${pkg.title})`,
-          `mkdir -p ${remoteDir}`,
-        ))
-      ) {
-        return false;
+  const executeAndThrow = useCallback(
+    async (title: string, command: string, timeoutSeconds = 120) => {
+      const ok = await executeAndLog(title, command, timeoutSeconds);
+      if (!ok) {
+        throw new Error(title);
       }
-      await executeAndLog(
-        `修正权限 (${pkg.title})`,
-        `sudo chown -R ${config.user}:${config.user} ${remoteDir}`,
-      );
-      if (!(await uploadViaSftp(remoteArchive, payload.base64, pkg.title))) {
-        return false;
-      }
-      if (
-        !(await executeAndLog(
-          `解压安装包 (${pkg.title})`,
-          `tar ${payload.isGzip ? '-xzf' : '-xf'} ${remoteArchive} -C ${remoteDir}`,
-          180,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `清理压缩包 (${pkg.title})`,
-        `rm -f ${remoteArchive}`,
-      );
-      if (
-        !(await executeAndLog(
-          `安装依赖 (${pkg.title})`,
-          'python3 -m pip install --upgrade pip setuptools wheel uuid6 watchdog',
-          180,
-        ))
-      ) {
-        return false;
-      }
-      return executeAndLog(
-        `安装包 (${pkg.title})`,
-        `python3 -m pip install -e ${remoteDir}`,
-        180,
-      );
     },
-    [config.user, executeAndLog, getPackageBase64, uploadViaSftp],
+    [executeAndLog],
   );
 
-  const installServer = useCallback(
-    async (pkg: PackageSpec) => {
-      const remoteDir = `/home/${config.user}/sparkrobot/${pkg.name}`;
-      setProgress(`读取 ${pkg.title}`);
-      const payload = await getPackageBase64(pkg.fileName);
-      const remoteArchive = `/tmp/${pkg.name}${payload.isGzip ? '.tar.gz' : '.tar'}`;
-      if (
-        !(await executeAndLog(
-          `创建目录 (${pkg.title})`,
-          `mkdir -p ${remoteDir}`,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `修正权限 (${pkg.title})`,
-        `sudo chown -R ${config.user}:${config.user} ${remoteDir}`,
-      );
-      if (!(await uploadViaSftp(remoteArchive, payload.base64, pkg.title))) {
-        return false;
-      }
-      if (
-        !(await executeAndLog(
-          `解压安装包 (${pkg.title})`,
-          `tar ${payload.isGzip ? '-xzf' : '-xf'} ${remoteArchive} -C ${remoteDir}`,
-          180,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `清理压缩包 (${pkg.title})`,
-        `rm -f ${remoteArchive}`,
-      );
-      if (
-        !(await executeAndLog(
-          `安装依赖 (${pkg.title})`,
-          `python3 -m pip install ${remoteDir}`,
-          180,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `赋权脚本 (${pkg.title})`,
-        `chmod +x ${remoteDir}/scripts/install.sh`,
-      );
-      return executeAndLog(
-        `运行安装脚本 (${pkg.title})`,
-        `sudo bash ${remoteDir}/scripts/install.sh`,
-        180,
-      );
+  const installPackage = useCallback(
+    async (type: PackageType) => {
+      const spec = PACKAGE_INSTALL_SPECS[type];
+      setProgress(`读取 ${spec.title}`);
+      const payload = await getPackageBase64(spec.archiveName);
+      await installPackageFromBase64({
+        type,
+        user: config.user,
+        archiveBase64: payload.base64,
+        archiveFileName: payload.fileName,
+        runRemoteCommand: executeAndThrow,
+        uploadRemoteFile: uploadViaSftpOrThrow,
+        onProgress: setProgress,
+      });
     },
-    [config.user, executeAndLog, getPackageBase64, uploadViaSftp],
-  );
-
-  const installAgent = useCallback(
-    async (pkg: PackageSpec) => {
-      const remoteDir = `/home/${config.user}/sparkrobot/${pkg.name}`;
-      setProgress(`读取 ${pkg.title}`);
-      const payload = await getPackageBase64(pkg.fileName);
-      const remoteArchive = `/tmp/${pkg.name}${payload.isGzip ? '.tar.gz' : '.tar'}`;
-      if (
-        !(await executeAndLog(
-          `创建目录 (${pkg.title})`,
-          `mkdir -p ${remoteDir}`,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `修正权限 (${pkg.title})`,
-        `sudo chown -R ${config.user}:${config.user} ${remoteDir}`,
-      );
-      if (!(await uploadViaSftp(remoteArchive, payload.base64, pkg.title))) {
-        return false;
-      }
-      if (
-        !(await executeAndLog(
-          `解压安装包 (${pkg.title})`,
-          `tar ${payload.isGzip ? '-xzf' : '-xf'} ${remoteArchive} -C ${remoteDir}`,
-          180,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `清理压缩包 (${pkg.title})`,
-        `rm -f ${remoteArchive}`,
-      );
-      if (
-        !(await executeAndLog(
-          `安装依赖 (${pkg.title})`,
-          `python3 -m pip install ${remoteDir}`,
-          180,
-        ))
-      ) {
-        return false;
-      }
-      await executeAndLog(
-        `赋权脚本 (${pkg.title})`,
-        `chmod +x ${remoteDir}/scripts/install.sh`,
-      );
-      return executeAndLog(
-        `运行安装脚本 (${pkg.title})`,
-        `sudo bash ${remoteDir}/scripts/install.sh`,
-        180,
-      );
-    },
-    [config.user, executeAndLog, getPackageBase64, uploadViaSftp],
+    [config.user, executeAndThrow, getPackageBase64, uploadViaSftpOrThrow],
   );
 
   const handleInstall = useCallback(async () => {
@@ -400,26 +241,18 @@ export function FirstInstallScreen() {
     try {
       const ok = await ensureConnected();
       if (!ok) return;
-      const common = PACKAGE_LIST[0];
-      const server = PACKAGE_LIST[1];
-      const agent = PACKAGE_LIST[2];
-      setProgress(`开始 ${common.title}`);
-      if (!(await installCommon(common))) {
-        Toast.show('安装 sparkrobot-common 失败');
-        return;
-      }
-      setProgress(`开始 ${server.title}`);
-      if (!(await installServer(server))) {
-        Toast.show('安装 robot-server 失败');
-        return;
-      }
-      setProgress(`开始 ${agent.title}`);
-      if (!(await installAgent(agent))) {
-        Toast.show('安装 robot-agent 失败');
-        return;
+      for (const type of PACKAGE_INSTALL_ORDER) {
+        const spec = PACKAGE_INSTALL_SPECS[type];
+        setProgress(`开始 ${spec.title}`);
+        try {
+          await installPackage(type);
+        } catch {
+          Toast.show(`安装 ${spec.name} 失败`);
+          return;
+        }
       }
       setProgress('安装完成');
-      Toast.show('首次安装完成');
+      Toast.show('安装完成');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendLog({ title: '安装失败', output: msg, isError: true });
@@ -430,9 +263,7 @@ export function FirstInstallScreen() {
   }, [
     appendLog,
     ensureConnected,
-    installAgent,
-    installCommon,
-    installServer,
+    installPackage,
     installing,
   ]);
 
@@ -792,14 +623,17 @@ export function FirstInstallScreen() {
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
               <View style={styles.sectionBody}>
-                {PACKAGE_LIST.map((pkg, idx) => (
-                  <InfoRow
-                    key={pkg.key}
-                    label={pkg.title}
-                    value={pkg.name}
-                    isLast={idx === PACKAGE_LIST.length - 1}
-                  />
-                ))}
+                {PACKAGE_INSTALL_ORDER.map((type, idx) => {
+                  const spec = PACKAGE_INSTALL_SPECS[type];
+                  return (
+                    <InfoRow
+                      key={spec.key}
+                      label={spec.title}
+                      value={spec.name}
+                      isLast={idx === PACKAGE_INSTALL_ORDER.length - 1}
+                    />
+                  );
+                })}
               </View>
             </>
           )}

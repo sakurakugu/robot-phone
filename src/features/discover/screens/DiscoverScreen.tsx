@@ -3,9 +3,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
-import { useAuth } from '../../auth/AuthContext';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
+import { useAuth } from '../../auth/AuthContext';
 
 type NavItem = {
   id: string;
@@ -26,9 +26,9 @@ const ALL_DISCOVER_ITEMS: NavItem[] = [
   },
   {
     id: 'first-install',
-    title: '首次安装机器狗软件',
+    title: '安装机器狗软件',
     desc: '通过 SSH 安装机器人基础服务',
-    route: '首次安装机器狗软件',
+    route: '安装机器狗软件',
     adminOnly: false,
   },
   { id: 'd1', title: '新能力中心', desc: '后续接入插件与技能商店' },

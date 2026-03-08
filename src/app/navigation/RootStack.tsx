@@ -1,6 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { AuthScreen } from '../../features/auth/screens/AuthScreen';
+import { FirstInstallScreen } from '../../features/discover/screens/InstallScreen';
+import { SshTerminalScreen } from '../../features/discover/screens/SshTerminalScreen';
 import { LoginSessionsScreen } from '../../features/profile/screens/LoginSessionsScreen';
 import { PersonalCenterScreen } from '../../features/profile/screens/PersonalCenterScreen';
 import { PersonalProfileScreen } from '../../features/profile/screens/PersonalProfileScreen';
@@ -20,8 +22,6 @@ import { RobotOperationScreen } from '../../features/robots/screens/RobotOperati
 import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
 import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
 import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
-import { FirstInstallScreen } from '../../features/discover/screens/FirstInstallScreen';
-import { SshTerminalScreen } from '../../features/discover/screens/SshTerminalScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
 import { NetworkEnvironmentScreen } from '../../features/settings/screens/NetworkEnvironmentScreen';
@@ -82,7 +82,7 @@ export function RootStack() {
       <Stack.Screen name="个人中心" component={PersonalCenterScreen} />
       <Stack.Screen name="个人资料" component={PersonalProfileScreen} />
       <Stack.Screen name="SSH 终端" component={SshTerminalScreen} />
-      <Stack.Screen name="首次安装机器狗软件" component={FirstInstallScreen} />
+      <Stack.Screen name="安装机器狗软件" component={FirstInstallScreen} />
     </Stack.Navigator>
   );
 }
