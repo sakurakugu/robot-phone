@@ -31,9 +31,9 @@ const ALL_DISCOVER_ITEMS: NavItem[] = [
     route: '安装机器狗软件',
     adminOnly: false,
   },
-  { id: 'd1', title: '新能力中心', desc: '后续接入插件与技能商店' },
-  { id: 'd2', title: '任务模板', desc: '快速创建巡检/守卫任务' },
-  { id: 'd3', title: '场景联动', desc: '机器人 + 设备自动化' },
+  { id: 'd1', title: '新能力中心(模板)', desc: '后续接入插件与技能商店' },
+  { id: 'd2', title: '任务模板(模板)', desc: '快速创建巡检/守卫任务' },
+  { id: 'd3', title: '场景联动(模板)', desc: '机器人 + 设备自动化' },
 ];
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin']);
