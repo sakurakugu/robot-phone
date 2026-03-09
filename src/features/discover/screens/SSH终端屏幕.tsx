@@ -40,7 +40,7 @@ type HistoryEntry = SshExecuteResult & { id: number };
 // 输入模式：单条命令 / 批量命令
 type InputMode = 'single' | 'batch';
 
-export function SshTerminalScreen() {
+export function SSHTerminalScreen() {
   const palette = usePalette();
 
   const [configExpanded, setConfigExpanded] = useState(true);
@@ -63,10 +63,15 @@ export function SshTerminalScreen() {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const scrollRef = useRef<ScrollView>(null);
+  const commandInputRef = useRef<TextInput>(null);
   const idRef = useRef(0);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  }, []);
+
+  const focusSingleInput = useCallback(() => {
+    setTimeout(() => commandInputRef.current?.focus(), 0);
   }, []);
 
   useEffect(() => {
@@ -143,9 +148,13 @@ export function SshTerminalScreen() {
   // ── 执行单条命令 ────────────────────────────────────────────
   const handleExecute = useCallback(async () => {
     const cmd = command.trim();
-    if (!cmd) return;
+    if (!cmd) {
+      focusSingleInput();
+      return;
+    }
     if (!isConnected) {
       Toast.show('请先建立 SSH 连接');
+      focusSingleInput();
       return;
     }
 
@@ -163,8 +172,9 @@ export function SshTerminalScreen() {
     } finally {
       setLoading(false);
       scrollToBottom();
+      focusSingleInput();
     }
-  }, [command, isConnected, appendEntry, scrollToBottom]);
+  }, [command, isConnected, appendEntry, scrollToBottom, focusSingleInput]);
 
   // ── 批量执行 ────────────────────────────────────────────────
   const handleBatchExecute = useCallback(async () => {
@@ -477,6 +487,7 @@ export function SshTerminalScreen() {
             <View style={styles.singleInputRow}>
               <Text style={[styles.dollar, { color: palette.primary }]}>$</Text>
               <TextInput
+                ref={commandInputRef}
                 style={[styles.commandInput, { color: palette.text }]}
                 value={command}
                 onChangeText={setCommand}
@@ -486,7 +497,6 @@ export function SshTerminalScreen() {
                 autoCorrect={false}
                 returnKeyType="send"
                 onSubmitEditing={handleExecute}
-                editable={!loading}
               />
               <Pressable
                 style={[

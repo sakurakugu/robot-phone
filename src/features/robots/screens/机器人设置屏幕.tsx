@@ -25,7 +25,7 @@ import {
   installPackageFromBase64,
   PACKAGE_INSTALL_ORDER,
   PACKAGE_INSTALL_SPECS,
-} from '../services/robotPackageInstallService';
+} from '../services/机器人软件包安装服务';
 import type { RobotForm } from '../types';
 
 type RouteParams = {

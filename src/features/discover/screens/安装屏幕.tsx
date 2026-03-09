@@ -20,7 +20,7 @@ import {
   installPackageFromBase64,
   PACKAGE_INSTALL_ORDER,
   PACKAGE_INSTALL_SPECS,
-} from '../../robots/services/robotPackageInstallService';
+} from '../../robots/services/机器人软件包安装服务';
 
 type SshConfig = {
   host: string;

@@ -1,26 +1,26 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { AuthScreen } from '../../features/auth/screens/AuthScreen';
-import { FirstInstallScreen } from '../../features/discover/screens/InstallScreen';
-import { SshTerminalScreen } from '../../features/discover/screens/SshTerminalScreen';
+import { SSHTerminalScreen } from '../../features/discover/screens/SSH终端屏幕';
+import { FirstInstallScreen } from '../../features/discover/screens/安装屏幕';
 import { LoginSessionsScreen } from '../../features/profile/screens/LoginSessionsScreen';
 import { PersonalCenterScreen } from '../../features/profile/screens/PersonalCenterScreen';
 import { PersonalProfileScreen } from '../../features/profile/screens/PersonalProfileScreen';
-import { D1ControlScreen } from '../../features/robots/group-control/screens/D1ControlScreen';
-import { X2ControlScreen } from '../../features/robots/group-control/screens/X2ControlScreen';
-import { X2HaidilaoScreen } from '../../features/robots/group-control/screens/X2HaidilaoScreen';
-import { X2LingChuangScreen } from '../../features/robots/group-control/screens/X2LingChuangScreen';
-import { X2NormalScreen } from '../../features/robots/group-control/screens/X2NormalScreen';
-import { X2TaiCiScreen } from '../../features/robots/group-control/screens/X2TaiCiScreen';
-import { X2TejiScreen } from '../../features/robots/group-control/screens/X2TejiScreen';
-import { AddRobotScreen } from '../../features/robots/screens/AddRobotScreen';
-import { RobotChatScreen } from '../../features/robots/screens/RobotChatScreen';
-import { RobotConfigScreen } from '../../features/robots/screens/RobotConfigScreen';
-import { RobotGroupControlScreen } from '../../features/robots/screens/RobotGroupControlScreen';
-import { RobotLogScreen } from '../../features/robots/screens/RobotLogScreen';
-import { RobotOperationScreen } from '../../features/robots/screens/RobotOperationScreen';
-import { RobotSettingsScreen } from '../../features/robots/screens/RobotSettingsScreen';
-import { RobotWifiScreen } from '../../features/robots/screens/RobotWifiScreen';
+import { D1ControlScreen } from '../../features/robots/group-control/screens/D1控制屏幕';
+import { X2TaiCiScreen } from '../../features/robots/group-control/screens/X2台词屏幕';
+import { X2NormalScreen } from '../../features/robots/group-control/screens/X2基础屏幕';
+import { X2ControlScreen } from '../../features/robots/group-control/screens/X2控制屏幕';
+import { X2HaidilaoScreen } from '../../features/robots/group-control/screens/X2海底捞屏幕';
+import { X2LingChuangScreen } from '../../features/robots/group-control/screens/X2灵创屏幕';
+import { X2TejiScreen } from '../../features/robots/group-control/screens/X2特技屏幕';
+import { RobotWifiScreen } from '../../features/robots/screens/机器人WIFI屏幕';
+import { RobotChatScreen } from '../../features/robots/screens/机器人对话屏幕';
+import { RobotOperationScreen } from '../../features/robots/screens/机器人操作屏幕';
+import { RobotLogScreen } from '../../features/robots/screens/机器人日志屏幕';
+import { AddRobotScreen } from '../../features/robots/screens/机器人添加屏幕';
+import { RobotGroupControlScreen } from '../../features/robots/screens/机器人群控屏幕';
+import { RobotSettingsScreen } from '../../features/robots/screens/机器人设置屏幕';
+import { RobotConfigScreen } from '../../features/robots/screens/机器人配置屏幕';
 import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
@@ -81,7 +81,7 @@ export function RootStack() {
       <Stack.Screen name="登录设备" component={LoginSessionsScreen} />
       <Stack.Screen name="个人中心" component={PersonalCenterScreen} />
       <Stack.Screen name="个人资料" component={PersonalProfileScreen} />
-      <Stack.Screen name="SSH 终端" component={SshTerminalScreen} />
+      <Stack.Screen name="SSH 终端" component={SSHTerminalScreen} />
       <Stack.Screen name="安装机器狗软件" component={FirstInstallScreen} />
     </Stack.Navigator>
   );

@@ -1,15 +1,10 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import {
-  Bot,
-  Compass,
-  User,
-  Users,
-} from 'lucide-react-native';
+import { Bot, Compass, User, Users } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { DiscoverScreen } from '../../features/discover/screens/DiscoverScreen';
+import { DiscoverScreen } from '../../features/discover/screens/发现屏幕';
 import { ProfileScreen } from '../../features/profile/screens/ProfileScreen';
-import { RobotManagementScreen } from '../../features/robots/screens/RobotManagementScreen';
+import { RobotManagementScreen } from '../../features/robots/screens/机器人管理屏幕';
 import { RoleManagementScreen } from '../../features/roles/screens/RoleManagementScreen';
 import { usePalette } from '../theme/palette';
 
@@ -22,7 +17,10 @@ type TabIconProps = {
   focused: boolean;
 };
 
-const iconMap: Record<TabName, React.ComponentType<{ color: string; size?: number }>> = {
+const iconMap: Record<
+  TabName,
+  React.ComponentType<{ color: string; size?: number }>
+> = {
   机器人: Bot,
   角色: Users,
   发现: Compass,
@@ -46,7 +44,10 @@ function TabIcon({ name, focused }: TabIconProps) {
   );
 }
 
-const tabBarIconMap: Record<TabName, ({ focused }: { focused: boolean }) => React.JSX.Element> = {
+const tabBarIconMap: Record<
+  TabName,
+  ({ focused }: { focused: boolean }) => React.JSX.Element
+> = {
   机器人: ({ focused }) => <TabIcon name="机器人" focused={focused} />,
   角色: ({ focused }) => <TabIcon name="角色" focused={focused} />,
   发现: ({ focused }) => <TabIcon name="发现" focused={focused} />,
