@@ -10,10 +10,17 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   BackHandler,
   Dimensions,
+  GestureResponderEvent,
   Modal,
   PermissionsAndroid,
   Platform,
@@ -29,7 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../app/theme/palette';
 import { ChatDrawer } from '../components/ChatDrawer';
-import { JoystickPad } from '../components/JoystickPad';
+import { JoystickPad, JoystickPadHandle } from '../components/JoystickPad';
 import { RtspVideoPlayer } from '../components/RtspVideoPlayer';
 import {
   DanmakuItem,
@@ -191,6 +198,81 @@ export function RobotOperationScreen() {
   const rightJoyThrottleRef = useRef<number>(0);
   // 急停双击保护：记录上次点击时间
   const lastEstopPressRef = useRef<number>(0);
+
+  // ── 双摇杆多点触控（命令式模式）──────────────────────────────────────────
+  // Android 的 MotionEvent 只会将 ACTION_POINTER_DOWN 派发给首个触摸目标，
+  // 两个兄弟 View 无法同时独立接收各自手指的 onTouchMove 事件。
+  // 解决方案：在 floatingLayer 内放置单一透明 View 统一捕获所有手指事件，
+  // 根据初始触摸的 X 坐标（屏幕左50% → 左摇杆，右50% → 右摇杆）分配给对应摇杆，
+  // 再通过 ref 命令式驱动摇杆动画和回调。
+  const leftJoyRef = useRef<JoystickPadHandle>(null);
+  const rightJoyRef = useRef<JoystickPadHandle>(null);
+  // 记录各触控点 ID → 'left' | 'right' 的分配关系
+  const joyTouchSideRef = useRef(new Map<string, 'left' | 'right'>());
+  // 记录各触控点 ID → 起始屏幕坐标（用于计算偏移量）
+  const joyTouchOriginRef = useRef(new Map<string, { x: number; y: number }>());
+
+  // 最新 state 的 Ref，供触摸处理器直接读取（避免闭包捕获过期值）
+  const controlModeRef = useRef(controlMode);
+  controlModeRef.current = controlMode;
+  const twoLegStandActiveRef = useRef(twoLegStandActive);
+  twoLegStandActiveRef.current = twoLegStandActive;
+
+  const handleJoystickTouchStart = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      // 左 50%→左摇杆，右 50%→右摇杆，中间忽略（动作按钮区域在此范围）
+      let side: 'left' | 'right' | null = null;
+      if (t.pageX < screenWidth * 0.5)
+        side = 'left'; // 0.3 就是屏幕左30%, 现在是 0.5
+      else if (t.pageX > screenWidth * 0.5) side = 'right'; // 0.7 就是屏幕右30%, 现在是 0.5
+      if (!side) continue;
+      // 对应摇杆被禁用时忽略该触控
+      if (
+        side === 'left' &&
+        controlModeRef.current === 'pose' &&
+        !twoLegStandActiveRef.current
+      )
+        continue;
+      if (side === 'right' && twoLegStandActiveRef.current) continue;
+      joyTouchSideRef.current.set(t.identifier, side);
+      joyTouchOriginRef.current.set(t.identifier, { x: t.pageX, y: t.pageY });
+    }
+  };
+
+  const handleJoystickTouchMove = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      const side = joyTouchSideRef.current.get(t.identifier);
+      const origin = joyTouchOriginRef.current.get(t.identifier);
+      if (!side || !origin) continue;
+      const dx = t.pageX - origin.x;
+      const dy = t.pageY - origin.y;
+      if (side === 'left') {
+        leftJoyRef.current?.applyDelta(dx, dy);
+      } else {
+        rightJoyRef.current?.applyDelta(dx, dy);
+      }
+    }
+  };
+
+  const handleJoystickTouchEnd = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      const side = joyTouchSideRef.current.get(t.identifier);
+      if (!side) continue;
+      joyTouchSideRef.current.delete(t.identifier);
+      joyTouchOriginRef.current.delete(t.identifier);
+      if (side === 'left') {
+        leftJoyRef.current?.release();
+      } else {
+        rightJoyRef.current?.release();
+      }
+    }
+  };
 
   // ── 预计算遥测颜色（避免 inline 条件样式 lint 警告）─────────────────────────
   const dogOnlineColor = dogTelemetry.online
@@ -594,6 +676,20 @@ export function RobotOperationScreen() {
 
         {/* ── 浮层控件 ────────────────────────────────────────────────────── */}
         <View style={styles.floatingLayer} pointerEvents="box-none">
+          {/*
+            ── 摇杆统一触摸处理层（必须是 floatingLayer 的第一个子元素，z 最低）──
+            两个摇杆的所有手指事件由此单一 View 统一接收，避免 Android 多点触控时
+            ACTION_POINTER_DOWN 仅派发给首个触摸目标、兄弟 View 收不到事件的问题。
+            Pressable 按钮等在此 View 之后渲染（z 更高），优先接收各自的触摸。
+          */}
+          <View
+            style={StyleSheet.absoluteFill}
+            onTouchStart={handleJoystickTouchStart}
+            onTouchMove={handleJoystickTouchMove}
+            onTouchEnd={handleJoystickTouchEnd}
+            onTouchCancel={handleJoystickTouchEnd}
+          />
+
           {/* 右上角圆形按钮 */}
           <Pressable
             onPress={() => setChatVisible(true)}
@@ -633,15 +729,16 @@ export function RobotOperationScreen() {
             )}
           </Pressable>
 
-          {/* 左摇杆：前后左右移动（姿态模式下禁用；双腿站立模式走 two_leg 通道） */}
+          {/* 左摇杆视觉（pointerEvents="none" 使触摸穿透到底层统一处理 View） */}
           <View
             style={[
               styles.leftJoystick,
               { left: 16 + insets.left, bottom: 20 + insets.bottom },
             ]}
-            pointerEvents="box-none"
+            pointerEvents="none"
           >
             <JoystickPad
+              ref={leftJoyRef}
               disabled={controlMode === 'pose' && !twoLegStandActive}
               onMove={({ x, y }) => {
                 if (controlMode === 'pose' && !twoLegStandActive) return;
@@ -668,15 +765,16 @@ export function RobotOperationScreen() {
             />
           </View>
 
-          {/* 右摇杆：姿态模式=姿态控制（pose 通道），移动模式=偏航旋转（look 通道）；双腿站立时禁用 */}
+          {/* 右摇杆视觉（pointerEvents="none" 使触摸穿透到底层统一处理 View） */}
           <View
             style={[
               styles.rightJoystick,
               { right: 100 + insets.right, bottom: 20 + insets.bottom },
             ]}
-            pointerEvents="box-none"
+            pointerEvents="none"
           >
             <JoystickPad
+              ref={rightJoyRef}
               disabled={twoLegStandActive}
               onMove={({ x, y }) => {
                 if (twoLegStandActive) return;

@@ -16,6 +16,8 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
+  GestureResponderEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,7 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../../app/preferences/AppPreferences';
 import { usePalette } from '../../../../app/theme/palette';
 import { fetchRobots } from '../../api';
-import { JoystickPad } from '../../components/JoystickPad';
+import { JoystickPad, JoystickPadHandle } from '../../components/JoystickPad';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import type { Robot } from '../../types';
 import type { D1ControlMode } from '../d1/useD1GroupControl';
@@ -74,42 +76,6 @@ function ActionCard({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-// ─── 摇杆容器（带标签）────────────────────────────────────────────────────────
-function LabeledJoystick({
-  label,
-  onMove,
-  onEnd,
-  disabled,
-  palette,
-  colors,
-}: {
-  label: string;
-  onMove: (x: number, y: number) => void;
-  onEnd: () => void;
-  disabled?: boolean;
-  palette: ReturnType<typeof usePalette>;
-  colors?: {
-    outer?: string;
-    outerBorder?: string;
-    stick?: string;
-    stickBorder?: string;
-  };
-}) {
-  return (
-    <View style={styles.joystickContainer}>
-      <JoystickPad
-        onMove={p => onMove(p.x, p.y)}
-        onEnd={onEnd}
-        disabled={disabled}
-        colors={colors}
-      />
-      <Text style={[styles.joystickLabel, { color: palette.textMuted }]}>
-        {label}
-      </Text>
-    </View>
   );
 }
 
@@ -197,6 +163,59 @@ export function D1ControlScreen() {
     setControlMode(next);
     ctrl.sendSwitchMode(next);
   }
+
+  // ── 双摇杆多点触控 ─────────────────────────────────────────────────────────
+  const screenWidth = Dimensions.get('window').width;
+  const leftJoyRef = useRef<JoystickPadHandle>(null);
+  const rightJoyRef = useRef<JoystickPadHandle>(null);
+  const joyTouchSideRef = useRef(new Map<string, 'left' | 'right'>());
+  const joyTouchOriginRef = useRef(new Map<string, { x: number; y: number }>());
+
+  const handleJoystickTouchStart = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      let side: 'left' | 'right' | null = null;
+      if (t.pageX < screenWidth * 0.5) side = 'left';
+      else if (t.pageX > screenWidth * 0.5) side = 'right';
+      if (!side) continue;
+      joyTouchSideRef.current.set(t.identifier, side);
+      joyTouchOriginRef.current.set(t.identifier, { x: t.pageX, y: t.pageY });
+    }
+  };
+
+  const handleJoystickTouchMove = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      const side = joyTouchSideRef.current.get(t.identifier);
+      const origin = joyTouchOriginRef.current.get(t.identifier);
+      if (!side || !origin) continue;
+      const dx = t.pageX - origin.x;
+      const dy = t.pageY - origin.y;
+      if (side === 'left') {
+        leftJoyRef.current?.applyDelta(dx, dy);
+      } else {
+        rightJoyRef.current?.applyDelta(dx, dy);
+      }
+    }
+  };
+
+  const handleJoystickTouchEnd = (e: GestureResponderEvent) => {
+    const { changedTouches } = e.nativeEvent;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const t = changedTouches[i];
+      const side = joyTouchSideRef.current.get(t.identifier);
+      if (!side) continue;
+      joyTouchSideRef.current.delete(t.identifier);
+      joyTouchOriginRef.current.delete(t.identifier);
+      if (side === 'left') {
+        leftJoyRef.current?.release();
+      } else {
+        rightJoyRef.current?.release();
+      }
+    }
+  };
 
   // ── 摇杆节流 ─────────────────────────────────────────────────────────────
   const leftThrottle = useRef(0);
@@ -450,20 +469,40 @@ export function D1ControlScreen() {
           },
         ]}
       >
-        <LabeledJoystick
-          label="移动"
-          palette={palette}
-          onMove={handleLeftJoystick}
-          onEnd={handleLeftEnd}
-          colors={joystickColors}
+        {/*
+          单一触摸捕获 View，统一接收所有手指事件，根据触摸起始 X 坐标
+          （左50% → 左摇杆，右50% → 右摇杆）分发给对应摇杆的 ref，
+          解决 Android 多点触控时兄弟 View 无法同时接收事件的问题。
+        */}
+        <View
+          style={StyleSheet.absoluteFill}
+          onTouchStart={handleJoystickTouchStart}
+          onTouchMove={handleJoystickTouchMove}
+          onTouchEnd={handleJoystickTouchEnd}
+          onTouchCancel={handleJoystickTouchEnd}
         />
-        <LabeledJoystick
-          label={controlMode === 'pose' ? '姿态' : '转向'}
-          palette={palette}
-          onMove={handleRightJoystick}
-          onEnd={handleRightEnd}
-          colors={joystickColors}
-        />
+        <View style={styles.joystickContainer} pointerEvents="none">
+          <JoystickPad
+            ref={leftJoyRef}
+            onMove={({ x, y }) => handleLeftJoystick(x, y)}
+            onEnd={handleLeftEnd}
+            colors={joystickColors}
+          />
+          <Text style={[styles.joystickLabel, { color: palette.textMuted }]}>
+            移动
+          </Text>
+        </View>
+        <View style={styles.joystickContainer} pointerEvents="none">
+          <JoystickPad
+            ref={rightJoyRef}
+            onMove={({ x, y }) => handleRightJoystick(x, y)}
+            onEnd={handleRightEnd}
+            colors={joystickColors}
+          />
+          <Text style={[styles.joystickLabel, { color: palette.textMuted }]}>
+            {controlMode === 'pose' ? '姿态' : '转向'}
+          </Text>
+        </View>
       </View>
     </View>
   );

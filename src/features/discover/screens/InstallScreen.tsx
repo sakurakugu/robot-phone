@@ -17,11 +17,6 @@ import { Screen } from '../../../shared/ui/Screen';
 import { Toast } from '../../../shared/ui/Toast';
 import type { PackageType } from '../../robots/api';
 import {
-  ActionRow,
-  InfoRow,
-  InputRow,
-} from '../../robots/components/SettingsComponents';
-import {
   installPackageFromBase64,
   PACKAGE_INSTALL_ORDER,
   PACKAGE_INSTALL_SPECS,
@@ -260,12 +255,7 @@ export function FirstInstallScreen() {
     } finally {
       setInstalling(false);
     }
-  }, [
-    appendLog,
-    ensureConnected,
-    installPackage,
-    installing,
-  ]);
+  }, [appendLog, ensureConnected, installPackage, installing]);
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -538,60 +528,94 @@ export function FirstInstallScreen() {
               <View
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
-              <View style={styles.sectionBody}>
-                <InputRow
-                  label="SSID"
+              <View style={styles.configRow}>
+                <Text
+                  style={[styles.configLabel, { color: palette.textMuted }]}
+                >
+                  SSID
+                </Text>
+                <TextInput
+                  style={[styles.configInput, { color: palette.text }]}
                   value={wifiSsid}
                   onChangeText={setWifiSsid}
                   placeholder="WiFi名称"
+                  placeholderTextColor={palette.textMuted}
                   autoCapitalize="none"
-                />
-                <View style={styles.configRow}>
-                  <Text
-                    style={[
-                      styles.configLabel,
-                      styles.passwordLabel,
-                      { color: palette.textMuted },
-                    ]}
-                  >
-                    密码
-                  </Text>
-                  <Pressable
-                    onPress={() => setWifiPasswordVisible(v => !v)}
-                    style={styles.eyeBtn}
-                  >
-                    {wifiPasswordVisible ? (
-                      <EyeOff color={palette.textMuted} size={16} />
-                    ) : (
-                      <Eye color={palette.textMuted} size={16} />
-                    )}
-                  </Pressable>
-                  <TextInput
-                    style={[styles.configInput, { color: palette.text }]}
-                    value={wifiPassword}
-                    onChangeText={setWifiPassword}
-                    placeholder="WiFi密码"
-                    placeholderTextColor={palette.textMuted}
-                    secureTextEntry={wifiPasswordVisible}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <View
-                  style={[styles.divider, { backgroundColor: palette.border }]}
-                />
-                <ActionRow
-                  label={wifiWorking ? '处理中...' : '查看当前 WiFi 信息'}
-                  onPress={handleViewWifi}
-                  loading={wifiWorking}
-                />
-                <ActionRow
-                  label={wifiWorking ? '处理中...' : '连接 WiFi'}
-                  onPress={handleConnectWifi}
-                  loading={wifiWorking}
-                  isLast
+                  autoCorrect={false}
                 />
               </View>
+              <View
+                style={[styles.divider, { backgroundColor: palette.border }]}
+              />
+              <View style={styles.configRow}>
+                <Text
+                  style={[
+                    styles.configLabel,
+                    styles.passwordLabel,
+                    { color: palette.textMuted },
+                  ]}
+                >
+                  密码
+                </Text>
+                <Pressable
+                  onPress={() => setWifiPasswordVisible(v => !v)}
+                  style={styles.eyeBtn}
+                >
+                  {wifiPasswordVisible ? (
+                    <EyeOff color={palette.textMuted} size={16} />
+                  ) : (
+                    <Eye color={palette.textMuted} size={16} />
+                  )}
+                </Pressable>
+                <TextInput
+                  style={[styles.configInput, { color: palette.text }]}
+                  value={wifiPassword}
+                  onChangeText={setWifiPassword}
+                  placeholder="WiFi密码"
+                  placeholderTextColor={palette.textMuted}
+                  secureTextEntry={wifiPasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              <View
+                style={[styles.divider, { backgroundColor: palette.border }]}
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && !wifiWorking && styles.pressedRow,
+                ]}
+                onPress={wifiWorking ? undefined : handleViewWifi}
+              >
+                <Text
+                  style={[styles.rowActionText, { color: palette.primary }]}
+                >
+                  {wifiWorking ? '处理中...' : '查看当前 WiFi 信息'}
+                </Text>
+                {wifiWorking ? (
+                  <ActivityIndicator size="small" color={palette.textMuted} />
+                ) : null}
+              </Pressable>
+              <View
+                style={[styles.divider, { backgroundColor: palette.border }]}
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && !wifiWorking && styles.pressedRow,
+                ]}
+                onPress={wifiWorking ? undefined : handleConnectWifi}
+              >
+                <Text
+                  style={[styles.rowActionText, { color: palette.primary }]}
+                >
+                  {wifiWorking ? '处理中...' : '连接 WiFi'}
+                </Text>
+                {wifiWorking ? (
+                  <ActivityIndicator size="small" color={palette.textMuted} />
+                ) : null}
+              </Pressable>
             </>
           )}
         </View>
@@ -622,19 +646,37 @@ export function FirstInstallScreen() {
               <View
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
-              <View style={styles.sectionBody}>
-                {PACKAGE_INSTALL_ORDER.map((type, idx) => {
-                  const spec = PACKAGE_INSTALL_SPECS[type];
-                  return (
-                    <InfoRow
-                      key={spec.key}
-                      label={spec.title}
-                      value={spec.name}
-                      isLast={idx === PACKAGE_INSTALL_ORDER.length - 1}
-                    />
-                  );
-                })}
-              </View>
+              {PACKAGE_INSTALL_ORDER.map((type, idx) => {
+                const isLast = idx === PACKAGE_INSTALL_ORDER.length - 1;
+                const spec = PACKAGE_INSTALL_SPECS[type];
+                return (
+                  <React.Fragment key={spec.key}>
+                    <View style={styles.configRow}>
+                      <Text
+                        style={[
+                          styles.orderLabel,
+                          { color: palette.textMuted },
+                        ]}
+                      >
+                        {spec.title}
+                      </Text>
+                      <Text
+                        style={[styles.configValue, { color: palette.text }]}
+                      >
+                        {spec.name}
+                      </Text>
+                    </View>
+                    {!isLast && (
+                      <View
+                        style={[
+                          styles.divider,
+                          { backgroundColor: palette.border },
+                        ]}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </>
           )}
         </View>
@@ -665,19 +707,41 @@ export function FirstInstallScreen() {
               <View
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
-              <View style={styles.sectionBody}>
-                <ActionRow
-                  label={installing ? '安装中...' : '开始安装'}
-                  onPress={handleInstall}
-                  loading={installing}
-                />
-                <ActionRow
-                  label="断开连接"
-                  onPress={handleDisconnect}
-                  isLast
-                  subtitle={isConnected ? '当前已连接' : '未连接'}
-                />
-              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && !installing && styles.pressedRow,
+                ]}
+                onPress={installing ? undefined : handleInstall}
+              >
+                <Text
+                  style={[styles.rowActionText, { color: palette.primary }]}
+                >
+                  {installing ? '安装中...' : '开始安装'}
+                </Text>
+                {installing ? (
+                  <ActivityIndicator size="small" color={palette.textMuted} />
+                ) : null}
+              </Pressable>
+              <View
+                style={[styles.divider, { backgroundColor: palette.border }]}
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && styles.pressedRow,
+                ]}
+                onPress={handleDisconnect}
+              >
+                <Text style={[styles.rowActionText, { color: palette.danger }]}>
+                  断开连接
+                </Text>
+                <Text
+                  style={[styles.configValue, { color: palette.textMuted }]}
+                >
+                  {isConnected ? '当前已连接' : '未连接'}
+                </Text>
+              </Pressable>
             </>
           )}
         </View>
@@ -807,9 +871,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 3,
   },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   configLabel: {
     fontSize: 13,
     width: 52,
+  },
+  orderLabel: {
+    fontSize: 13,
+    width: 200,
   },
   passwordLabel: {
     width: 'auto',
@@ -821,12 +895,27 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     paddingVertical: 6,
   },
+  configValue: {
+    flex: 1,
+    fontSize: 13,
+    textAlign: 'right',
+    paddingVertical: 6,
+  },
   eyeBtn: {
     paddingRight: 8,
     paddingVertical: 4,
   },
+  rowActionText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  pressedRow: {
+    opacity: 0.8,
+  },
   sectionBody: {
-    padding: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
   },
   hintWrap: {
     paddingHorizontal: 16,
