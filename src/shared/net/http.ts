@@ -23,13 +23,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   const text = await response.text();
-  const payload = (text ? JSON.parse(text) : {}) as ApiEnvelope<T>;
+  let payload: ApiEnvelope<T> | null = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text) as ApiEnvelope<T>;
+    } catch {
+      const trimmed = text.trim();
+      const snippet = trimmed.slice(0, 120);
+      const contentType = response.headers.get('content-type') || 'unknown';
+      const statusMessage = `请求失败: HTTP ${response.status}`;
+      throw new Error(
+        response.ok
+          ? `响应解析失败: 期望 JSON，实际为 ${contentType}，响应片段: ${snippet}`
+          : `${statusMessage}，响应片段: ${snippet}`,
+      );
+    }
+  }
+  const normalized = (payload ?? {}) as ApiEnvelope<T>;
 
-  if (!response.ok || payload.success === false) {
-    throw new Error(payload.error || payload.message || `请求失败: ${response.status}`);
+  if (!response.ok || normalized.success === false) {
+    throw new Error(
+      normalized.error || normalized.message || `请求失败: ${response.status}`,
+    );
   }
 
-  return (payload.data ?? payload) as T;
+  return (normalized.data ?? normalized) as T;
 }
 
 export const http = {

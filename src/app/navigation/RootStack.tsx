@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { AuthScreen } from '../../features/auth/screens/AuthScreen';
+import { D1ChoreoPlayScreen } from '../../features/choreo/screens/舞蹈播放屏幕';
 import { SSHTerminalScreen } from '../../features/discover/screens/SSH终端屏幕';
 import { FirstInstallScreen } from '../../features/discover/screens/安装屏幕';
 import { LoginSessionsScreen } from '../../features/profile/screens/LoginSessionsScreen';
@@ -66,6 +67,7 @@ export function RootStack() {
       <Stack.Screen name="群控" component={RobotGroupControlScreen} />
       <Stack.Screen name="机器人对话" component={RobotChatScreen} />
       <Stack.Screen name="D1 机器狗群控" component={D1ControlScreen} />
+      <Stack.Screen name="舞蹈播放" component={D1ChoreoPlayScreen} />
       <Stack.Screen name="X2 机器人控制" component={X2ControlScreen} />
       <Stack.Screen name="X2 普通动作" component={X2NormalScreen} />
       <Stack.Screen name="X2 灵创动作" component={X2LingChuangScreen} />
