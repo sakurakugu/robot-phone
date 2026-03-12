@@ -61,7 +61,7 @@ const ACTION_BUTTONS = [
   { id: 'sit_down', label: '趴下', x: 44, y: 78 },
   { id: 'front_jump', label: '向前跳', x: 54, y: 78 },
   { id: 'jump', label: '向上跳', x: 64, y: 78 },
-  { id: 'backflip', label: '后空翻', x: 36, y: 88 },
+  { id: 'back_flip', label: '后空翻', x: 36, y: 88 },
   { id: 'two_leg_stand', label: '双腿站立', x: 50, y: 88 },
   { id: 'shake_hand', label: '打招呼', x: 64, y: 88 },
 ] as const;

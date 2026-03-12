@@ -10,7 +10,7 @@ import { useServerConnection } from '../../server/ServerConnectionContext';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
-  { id: 'm2', title: '参数管理', desc: '速度、阈值、巡检间隔等' },
+  { id: 'm2', title: '参数管理', desc: '速度、阈值、巡检间隔等 (占位，好看)' },
 ];
 
 export function ProfileScreen() {
@@ -57,7 +57,7 @@ export function ProfileScreen() {
               </Text>
             ) : (
               <Text style={[styles.meta, { color: palette.textMuted }]}>
-                临时访问，功能有限
+                临时访问，功能有限 (还没用户功能，没区别)
               </Text>
             )}
           </Pressable>
