@@ -22,6 +22,7 @@ import { getActiveEnvironment } from '../../../shared/config/environment';
 
 // 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）
 const WS_CHAT_PATH = '/api/v1/phone/business';
+const WS_AUDIO_UPLOAD_PATH = '/api/v1/phone/audio/upload';
 const CONNECT_TIMEOUT_MS = 8000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY_MS = 2000; // 指数退避：2s, 4s, 8s, 16s, 32s
@@ -60,6 +61,14 @@ export type UseRobotWebSocketResult = {
   sendRaw: (msg: WsMessage) => void;
   /** 注册消息监听，返回取消监听函数 */
   onMessage: (handler: MessageHandler) => () => void;
+  /** 音频上传通道是否已连接 */
+  isAudioUploadConnected: boolean;
+  /** 发送音频开始消息 */
+  sendAudioStart: (sessionId: string, sampleRate?: number, channels?: number, frameDurationMs?: number) => void;
+  /** 发送音频数据块（base64 编码的 PCM 数据） */
+  sendAudioChunk: (sessionId: string, seq: number, buffer: string, frameDurationMs?: number) => void;
+  /** 发送音频结束消息 */
+  sendAudioEnd: (sessionId: string, reason?: string) => void;
 };
 
 /** 将 http/https baseUrl 转为对应的 ws/wss URL，并拼接路径 */
@@ -70,12 +79,14 @@ function toWsUrl(baseUrl: string, path: string, robotId: string): string {
 
 export function useRobotWebSocket(): UseRobotWebSocketResult {
   const wsRef = useRef<WebSocket | null>(null);
+  const wsAudioRef = useRef<WebSocket | null>(null);
   const robotIdRef = useRef<string>('');
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
   const destroyedRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
+  const [isAudioUploadConnected, setIsAudioUploadConnected] = useState(false);
   const handlersRef = useRef<Set<MessageHandler>>(new Set());
 
   const clearReconnectTimer = () => {
@@ -98,7 +109,13 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       wsRef.current.close();
       wsRef.current = null;
     }
+    if (wsAudioRef.current) {
+      wsAudioRef.current.onclose = null;
+      wsAudioRef.current.close();
+      wsAudioRef.current = null;
+    }
     setIsConnected(false);
+    setIsAudioUploadConnected(false);
   }, []);
 
   /** 内部：建立一次 WebSocket 连接，断线后自动重连 */
@@ -164,6 +181,17 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       // 使用环境配置的 baseUrl 自动派生 WebSocket 地址
       const serverBase = getActiveEnvironment().baseUrl;
       openSocket(robotId, toWsUrl(serverBase, WS_CHAT_PATH, robotId));
+
+      // 音频上传通道（独立连接，不影响业务通道）
+      try {
+        const audioWs = new WebSocket(toWsUrl(serverBase, WS_AUDIO_UPLOAD_PATH, robotId));
+        wsAudioRef.current = audioWs;
+        audioWs.onopen = () => setIsAudioUploadConnected(true);
+        audioWs.onclose = () => { setIsAudioUploadConnected(false); wsAudioRef.current = null; };
+        audioWs.onerror = () => { /* 等待 onclose */ };
+      } catch {
+        console.warn('[useRobotWebSocket] 音频上传通道连接失败');
+      }
     },
     [disconnect, openSocket],
   );
@@ -200,6 +228,57 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
     [sendRaw],
   );
 
+  // ── 音频上传方法 ──────────────────────────────────────────────
+
+  const sendAudioRaw = useCallback((msg: WsMessage) => {
+    if (wsAudioRef.current?.readyState !== WebSocket.OPEN) {
+      console.warn('[useRobotWebSocket] 音频上传通道未就绪，消息丢弃:', msg.type);
+      return;
+    }
+    wsAudioRef.current.send(JSON.stringify(msg));
+  }, []);
+
+  /** 发送音频开始消息 */
+  const sendAudioStart = useCallback(
+    (sessionId: string, sampleRate = 16000, channels = 1, frameDurationMs = 20) => {
+      // TODO: 后续替换 format 为 opus
+      sendAudioRaw({
+        type: 'audio_start',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: { format: 'pcm', sampleRate, channels, frameDurationMs, sessionId },
+      });
+    },
+    [sendAudioRaw],
+  );
+
+  /** 发送音频数据块（base64 编码的 PCM 数据） */
+  const sendAudioChunk = useCallback(
+    (sessionId: string, seq: number, buffer: string, frameDurationMs = 20) => {
+      // TODO: 后续替换 format 为 opus
+      sendAudioRaw({
+        type: 'audio_chunk',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: { format: 'pcm', sampleRate: 16000, channels: 1, sessionId, seq, frameDurationMs, buffer },
+      });
+    },
+    [sendAudioRaw],
+  );
+
+  /** 发送音频结束消息 */
+  const sendAudioEnd = useCallback(
+    (sessionId: string, reason = 'manual') => {
+      sendAudioRaw({
+        type: 'audio_end',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: { sessionId, reason },
+      });
+    },
+    [sendAudioRaw],
+  );
+
   useEffect(() => {
     destroyedRef.current = false;
     return () => {
@@ -208,5 +287,8 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
     };
   }, [disconnect]);
 
-  return { isConnected, connect, disconnect, sendToAI, sendToRobot, sendAction, sendRaw, onMessage };
+  return {
+    isConnected, connect, disconnect, sendToAI, sendToRobot, sendAction, sendRaw, onMessage,
+    isAudioUploadConnected, sendAudioStart, sendAudioChunk, sendAudioEnd,
+  };
 }

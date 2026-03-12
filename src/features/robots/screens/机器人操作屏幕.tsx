@@ -44,8 +44,10 @@ import {
   useStatusDanmaku,
 } from '../components/StatusDanmaku';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { VoiceRecordButton } from '../components/VoiceRecordButton';
 import { useDirectRobotControl } from '../hooks/useDirectRobotControl';
 import { useRobotTelemetry } from '../hooks/useRobotTelemetry';
+import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
 
 type RouteParams = {
   robotUuid: string;
@@ -192,6 +194,28 @@ export function RobotOperationScreen() {
 
   // 直连机器狗控制（同局域网时绕过云端服务器）
   const directCtrl = useDirectRobotControl(robotIp);
+
+  // 后端 WebSocket（用于语音录制上传通道）
+  const cloudWs = useRobotWebSocket();
+  useEffect(() => {
+    if (robotUuid) cloudWs.connect(robotUuid);
+    return () => cloudWs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotUuid]);
+  const audioMethods = useMemo(
+    () => ({
+      sendAudioStart: cloudWs.sendAudioStart,
+      sendAudioChunk: cloudWs.sendAudioChunk,
+      sendAudioEnd: cloudWs.sendAudioEnd,
+      isAudioUploadConnected: cloudWs.isAudioUploadConnected,
+    }),
+    [
+      cloudWs.sendAudioStart,
+      cloudWs.sendAudioChunk,
+      cloudWs.sendAudioEnd,
+      cloudWs.isAudioUploadConnected,
+    ],
+  );
 
   // 摇杆发送阶趾（ms），避免频繁刷新发送
   const leftJoyThrottleRef = useRef<number>(0);
@@ -577,6 +601,25 @@ export function RobotOperationScreen() {
               急停
             </Text>
           </Pressable>
+
+          {/* 机器狗麦克风开关 */}
+          <Pressable
+            onPress={() => {
+              const nextVal = !micEnabled;
+              setMicEnabled(nextVal);
+              directCtrl.sendMicControl(nextVal);
+              sendControl(
+                nextVal ? '机器狗麦克风已开启' : '机器狗麦克风已关闭',
+              );
+            }}
+            style={[styles.smallBtn, { borderColor: palette.border }]}
+          >
+            {micEnabled ? (
+              <Mic size={16} color={palette.text} />
+            ) : (
+              <MicOff size={16} color={palette.danger} />
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.rightInfo}>
@@ -706,28 +749,10 @@ export function RobotOperationScreen() {
             <Text style={[styles.btnText, { color: palette.text }]}>对话</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => {
-              const nextVal = !micEnabled;
-              setMicEnabled(nextVal);
-              directCtrl.sendMicControl(nextVal);
-            }}
-            style={[
-              styles.circleBtn,
-              styles.micPos,
-              {
-                backgroundColor: palette.surface + 'E6',
-                borderColor: palette.border,
-                right: 20 + insets.right,
-              },
-            ]}
-          >
-            {micEnabled ? (
-              <Mic size={24} color={palette.text} />
-            ) : (
-              <MicOff size={24} color={palette.danger} />
-            )}
-          </Pressable>
+          {/* 语音录制按钮（按住说话，发送到后端 ASR → 大模型） */}
+          <View style={[styles.micPos, { right: 20 + insets.right }]}>
+            <VoiceRecordButton audio={audioMethods} size={56} iconSize={22} />
+          </View>
 
           {/* 左摇杆视觉（pointerEvents="none" 使触摸穿透到底层统一处理 View） */}
           <View
@@ -1034,6 +1059,7 @@ const styles = StyleSheet.create({
     right: 20,
   },
   micPos: {
+    position: 'absolute',
     top: 88,
     right: 20,
   },

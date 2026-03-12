@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
+import { VoiceRecordButton } from './VoiceRecordButton';
 
 export type MessageTarget = 'ai' | 'robot';
 
@@ -102,7 +103,21 @@ export function RobotChatPanel({
     sendToRobot,
     sendAction,
     onMessage,
+    isAudioUploadConnected,
+    sendAudioStart,
+    sendAudioChunk,
+    sendAudioEnd,
   } = useRobotWebSocket();
+
+  const audioMethods = useMemo(
+    () => ({
+      sendAudioStart,
+      sendAudioChunk,
+      sendAudioEnd,
+      isAudioUploadConnected,
+    }),
+    [sendAudioStart, sendAudioChunk, sendAudioEnd, isAudioUploadConnected],
+  );
 
   const statusText = useMemo(() => {
     const status = isConnected ? '已连接' : '未连接';
@@ -335,7 +350,9 @@ export function RobotChatPanel({
               <Text
                 style={[
                   styles.metaLabel,
-                  isRight ? themedStyles.metaLabelRight : themedStyles.metaLabelLeft,
+                  isRight
+                    ? themedStyles.metaLabelRight
+                    : themedStyles.metaLabelLeft,
                 ]}
               >
                 {isUser
@@ -347,7 +364,9 @@ export function RobotChatPanel({
               <Text
                 style={[
                   styles.metaTime,
-                  isRight ? themedStyles.metaTimeRight : themedStyles.metaTimeLeft,
+                  isRight
+                    ? themedStyles.metaTimeRight
+                    : themedStyles.metaTimeLeft,
                 ]}
               >
                 {formatTime(item.timestamp)}
@@ -394,7 +413,9 @@ export function RobotChatPanel({
           <View
             style={[
               styles.dot,
-              isConnected ? themedStyles.dotConnected : themedStyles.dotDisconnected,
+              isConnected
+                ? themedStyles.dotConnected
+                : themedStyles.dotDisconnected,
             ]}
           />
           <Text style={[styles.statusText, themedStyles.statusText]}>
@@ -437,6 +458,7 @@ export function RobotChatPanel({
           numberOfLines={2}
         />
         <View style={styles.btnGroup}>
+          <VoiceRecordButton audio={audioMethods} size={32} iconSize={14} />
           <Pressable
             style={[
               styles.sendBtn,
