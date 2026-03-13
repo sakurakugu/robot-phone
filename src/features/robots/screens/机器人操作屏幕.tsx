@@ -21,6 +21,7 @@ import {
   BackHandler,
   Dimensions,
   GestureResponderEvent,
+  LayoutRectangle,
   Modal,
   PermissionsAndroid,
   Platform,
@@ -57,6 +58,7 @@ type RouteParams = {
 };
 
 type ControlMode = 'move' | 'pose';
+const JOYSTICK_HIT_RADIUS = 70;
 
 const ACTION_BUTTONS = [
   { id: 'stand_up', label: '起立', x: 34, y: 78 },
@@ -227,10 +229,14 @@ export function RobotOperationScreen() {
   // Android 的 MotionEvent 只会将 ACTION_POINTER_DOWN 派发给首个触摸目标，
   // 两个兄弟 View 无法同时独立接收各自手指的 onTouchMove 事件。
   // 解决方案：在 floatingLayer 内放置单一透明 View 统一捕获所有手指事件，
-  // 根据初始触摸的 X 坐标（屏幕左50% → 左摇杆，右50% → 右摇杆）分配给对应摇杆，
+  // 仅当触点命中摇杆圆形区域时才分配给对应摇杆，
   // 再通过 ref 命令式驱动摇杆动画和回调。
   const leftJoyRef = useRef<JoystickPadHandle>(null);
   const rightJoyRef = useRef<JoystickPadHandle>(null);
+  const leftJoyWrapRef = useRef<View>(null);
+  const rightJoyWrapRef = useRef<View>(null);
+  const leftJoyLayoutRef = useRef<LayoutRectangle | null>(null);
+  const rightJoyLayoutRef = useRef<LayoutRectangle | null>(null);
   // 记录各触控点 ID → 'left' | 'right' 的分配关系
   const joyTouchSideRef = useRef(new Map<string, 'left' | 'right'>());
   // 记录各触控点 ID → 起始屏幕坐标（用于计算偏移量）
@@ -242,15 +248,43 @@ export function RobotOperationScreen() {
   const twoLegStandActiveRef = useRef(twoLegStandActive);
   twoLegStandActiveRef.current = twoLegStandActive;
 
+  const updateJoystickLayout = useCallback((side: 'left' | 'right') => {
+    const targetRef = side === 'left' ? leftJoyWrapRef : rightJoyWrapRef;
+    targetRef.current?.measureInWindow((x, y, width, height) => {
+      const layout = { x, y, width, height };
+      if (side === 'left') {
+        leftJoyLayoutRef.current = layout;
+      } else {
+        rightJoyLayoutRef.current = layout;
+      }
+    });
+  }, []);
+
+  const isTouchInsideJoystick = useCallback(
+    (touchX: number, touchY: number, side: 'left' | 'right') => {
+      const layout =
+        side === 'left' ? leftJoyLayoutRef.current : rightJoyLayoutRef.current;
+      if (!layout) return false;
+      const centerX = layout.x + layout.width / 2;
+      const centerY = layout.y + layout.height / 2;
+      const dx = touchX - centerX;
+      const dy = touchY - centerY;
+      return dx * dx + dy * dy <= JOYSTICK_HIT_RADIUS * JOYSTICK_HIT_RADIUS;
+    },
+    [],
+  );
+
   const handleJoystickTouchStart = (e: GestureResponderEvent) => {
     const { changedTouches } = e.nativeEvent;
     for (let i = 0; i < changedTouches.length; i++) {
       const t = changedTouches[i];
-      // 左 50%→左摇杆，右 50%→右摇杆，中间忽略（动作按钮区域在此范围）
+      // 触点必须落在摇杆圆形区域内，才算命中对应摇杆
       let side: 'left' | 'right' | null = null;
-      if (t.pageX < screenWidth * 0.5)
-        side = 'left'; // 0.3 就是屏幕左30%, 现在是 0.5
-      else if (t.pageX > screenWidth * 0.5) side = 'right'; // 0.7 就是屏幕右30%, 现在是 0.5
+      if (isTouchInsideJoystick(t.pageX, t.pageY, 'left')) {
+        side = 'left';
+      } else if (isTouchInsideJoystick(t.pageX, t.pageY, 'right')) {
+        side = 'right';
+      }
       if (!side) continue;
       // 对应摇杆被禁用时忽略该触控
       if (
@@ -760,6 +794,8 @@ export function RobotOperationScreen() {
               styles.leftJoystick,
               { left: 16 + insets.left, bottom: 20 + insets.bottom },
             ]}
+            ref={leftJoyWrapRef}
+            onLayout={() => updateJoystickLayout('left')}
             pointerEvents="none"
           >
             <JoystickPad
@@ -796,6 +832,8 @@ export function RobotOperationScreen() {
               styles.rightJoystick,
               { right: 100 + insets.right, bottom: 20 + insets.bottom },
             ]}
+            ref={rightJoyWrapRef}
+            onLayout={() => updateJoystickLayout('right')}
             pointerEvents="none"
           >
             <JoystickPad

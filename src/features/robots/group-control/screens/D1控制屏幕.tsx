@@ -16,8 +16,8 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   GestureResponderEvent,
+  LayoutRectangle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +36,7 @@ import type { D1ControlMode } from '../d1/useD1GroupControl';
 import { useD1GroupControl } from '../d1/useD1GroupControl';
 
 const JOYSTICK_THROTTLE_MS = 50;
+const JOYSTICK_HIT_RADIUS = 70;
 
 const ACTION_BUTTONS = [
   { id: 'stand_up', label: '起立' },
@@ -165,19 +166,51 @@ export function D1ControlScreen() {
   }
 
   // ── 双摇杆多点触控 ─────────────────────────────────────────────────────────
-  const screenWidth = Dimensions.get('window').width;
   const leftJoyRef = useRef<JoystickPadHandle>(null);
   const rightJoyRef = useRef<JoystickPadHandle>(null);
+  const leftJoyWrapRef = useRef<View>(null);
+  const rightJoyWrapRef = useRef<View>(null);
+  const leftJoyLayoutRef = useRef<LayoutRectangle | null>(null);
+  const rightJoyLayoutRef = useRef<LayoutRectangle | null>(null);
   const joyTouchSideRef = useRef(new Map<string, 'left' | 'right'>());
   const joyTouchOriginRef = useRef(new Map<string, { x: number; y: number }>());
+
+  const updateJoystickLayout = useCallback((side: 'left' | 'right') => {
+    const targetRef = side === 'left' ? leftJoyWrapRef : rightJoyWrapRef;
+    targetRef.current?.measureInWindow((x, y, width, height) => {
+      const layout = { x, y, width, height };
+      if (side === 'left') {
+        leftJoyLayoutRef.current = layout;
+      } else {
+        rightJoyLayoutRef.current = layout;
+      }
+    });
+  }, []);
+
+  const isTouchInsideJoystick = useCallback(
+    (touchX: number, touchY: number, side: 'left' | 'right') => {
+      const layout =
+        side === 'left' ? leftJoyLayoutRef.current : rightJoyLayoutRef.current;
+      if (!layout) return false;
+      const centerX = layout.x + layout.width / 2;
+      const centerY = layout.y + layout.height / 2;
+      const dx = touchX - centerX;
+      const dy = touchY - centerY;
+      return dx * dx + dy * dy <= JOYSTICK_HIT_RADIUS * JOYSTICK_HIT_RADIUS;
+    },
+    [],
+  );
 
   const handleJoystickTouchStart = (e: GestureResponderEvent) => {
     const { changedTouches } = e.nativeEvent;
     for (let i = 0; i < changedTouches.length; i++) {
       const t = changedTouches[i];
       let side: 'left' | 'right' | null = null;
-      if (t.pageX < screenWidth * 0.5) side = 'left';
-      else if (t.pageX > screenWidth * 0.5) side = 'right';
+      if (isTouchInsideJoystick(t.pageX, t.pageY, 'left')) {
+        side = 'left';
+      } else if (isTouchInsideJoystick(t.pageX, t.pageY, 'right')) {
+        side = 'right';
+      }
       if (!side) continue;
       joyTouchSideRef.current.set(t.identifier, side);
       joyTouchOriginRef.current.set(t.identifier, { x: t.pageX, y: t.pageY });
@@ -481,7 +514,12 @@ export function D1ControlScreen() {
           onTouchEnd={handleJoystickTouchEnd}
           onTouchCancel={handleJoystickTouchEnd}
         />
-        <View style={styles.joystickContainer} pointerEvents="none">
+        <View
+          style={styles.joystickContainer}
+          ref={leftJoyWrapRef}
+          onLayout={() => updateJoystickLayout('left')}
+          pointerEvents="none"
+        >
           <JoystickPad
             ref={leftJoyRef}
             onMove={({ x, y }) => handleLeftJoystick(x, y)}
@@ -492,7 +530,12 @@ export function D1ControlScreen() {
             移动
           </Text>
         </View>
-        <View style={styles.joystickContainer} pointerEvents="none">
+        <View
+          style={styles.joystickContainer}
+          ref={rightJoyWrapRef}
+          onLayout={() => updateJoystickLayout('right')}
+          pointerEvents="none"
+        >
           <JoystickPad
             ref={rightJoyRef}
             onMove={({ x, y }) => handleRightJoystick(x, y)}

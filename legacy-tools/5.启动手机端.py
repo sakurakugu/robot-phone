@@ -502,7 +502,7 @@ def start_android() -> List[Tuple[str, int]]:
     device_id = _pick_android_device()
     if device_id:
         print(f"✅ 已检测到设备：{device_id}，跳过启动模拟器")
-        cmd = ["npm", "run", "android", "--", "--deviceId", device_id]
+        cmd = ["npm", "run", "android", "--", "--device", device_id]
     else:
         print("ℹ️  未检测到已连接设备，将尝试启动模拟器")
         cmd = ["npm", "run", "android"]
