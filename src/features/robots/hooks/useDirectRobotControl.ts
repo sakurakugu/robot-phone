@@ -98,6 +98,8 @@ export function useDirectRobotControl(
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destroyedRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
+  // 摇杆四轴缓存：[Axis0, Axis1, Axis2, Axis3]
+  const joystickAxesRef = useRef<[number, number, number, number]>([0, 0, 0, 0]);
 
   // ── 底层发送 ─────────────────────────────────────────────────────────────
   const sendRaw = useCallback((data: object) => {
@@ -105,6 +107,22 @@ export function useDirectRobotControl(
       wsRef.current.send(JSON.stringify(data));
     }
   }, []);
+
+  const sendMergedJoystick = useCallback(
+    (mode: DirectControlMode, speed: number = 5) => {
+      const [axis0, axis1, axis2, axis3] = joystickAxesRef.current;
+      sendRaw({
+        type: 'control_command',
+        data: {
+          command: 'joystick',
+          mode,
+          speed,
+          joystick: [axis0, axis1, axis2, axis3],
+        },
+      });
+    },
+    [sendRaw],
+  );
 
   // ── 公开 API ─────────────────────────────────────────────────────────────
   const sendJoystick = useCallback(
@@ -115,22 +133,48 @@ export function useDirectRobotControl(
       y: number,
       speed: number = 5,
     ) => {
-      sendRaw({
-        type: 'control_command',
-        data: { command: 'joystick', mode, channel, x, y, speed },
-      });
+      if (mode === 'two_leg') {
+        // 双腿模式沿用左摇杆双轴：Axis0=vx, Axis1=yaw
+        joystickAxesRef.current[0] = x;
+        joystickAxesRef.current[1] = y;
+        joystickAxesRef.current[2] = 0;
+        joystickAxesRef.current[3] = 0;
+      } else if (mode === 'pose' || channel === 'pose') {
+        // 姿态模式使用右摇杆：Axis2/Axis3
+        joystickAxesRef.current[2] = x;
+        joystickAxesRef.current[3] = y;
+      } else if (channel === 'look') {
+        // 移动模式右摇杆：水平轴（y）控制偏航
+        joystickAxesRef.current[2] = y;
+        joystickAxesRef.current[3] = 0;
+      } else {
+        // 移动模式左摇杆：Axis0/Axis1
+        joystickAxesRef.current[0] = x;
+        joystickAxesRef.current[1] = y;
+      }
+      sendMergedJoystick(mode, speed);
     },
-    [sendRaw],
+    [sendMergedJoystick],
   );
 
   const sendJoystickStop = useCallback(
     (mode: DirectControlMode, channel?: JoystickChannel) => {
-      sendRaw({
-        type: 'control_command',
-        data: { command: 'joystick_stop', mode, channel },
-      });
+      if (mode === 'two_leg') {
+        joystickAxesRef.current = [0, 0, 0, 0];
+      } else if (mode === 'pose' || channel === 'pose') {
+        joystickAxesRef.current[2] = 0;
+        joystickAxesRef.current[3] = 0;
+      } else if (channel === 'look') {
+        joystickAxesRef.current[2] = 0;
+        joystickAxesRef.current[3] = 0;
+      } else {
+        joystickAxesRef.current[0] = 0;
+        joystickAxesRef.current[1] = 0;
+      }
+      // 松开单摇杆时保留另一摇杆轴值，继续发送合并控制包
+      sendMergedJoystick(mode);
     },
-    [sendRaw],
+    [sendMergedJoystick],
   );
 
   const sendAction = useCallback(

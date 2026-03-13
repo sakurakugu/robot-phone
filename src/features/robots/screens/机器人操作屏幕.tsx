@@ -82,18 +82,19 @@ function SpeedSlider({
   const containerRef = useRef<View>(null);
   const widthRef = useRef(0);
   const pageXRef = useRef(0);
+  const maxSpeed = 30;
 
   const applyPageX = (pageX: number) => {
     const x = Math.max(0, pageX - pageXRef.current);
     const w = widthRef.current;
     if (!w) return;
-    // 速度范围 1-10
+    // 速度范围 1~maxSpeed
     const ratio = Math.min(1, Math.max(0, x / w));
-    const val = Math.round(1 + ratio * 9); // 1 + 0..9
+    const val = Math.round(1 + ratio * (maxSpeed - 1)); // 1 + 0..29 = 1 ~ maxSpeed
     onChange(val);
   };
 
-  const pct = ((value - 1) / 9) * 100;
+  const pct = ((value - 1) / (maxSpeed - 1)) * 100;
   const sliderWidth = 140;
   const fillWidth = (pct / 100) * sliderWidth;
   const thumbLeft = (pct / 100) * sliderWidth;

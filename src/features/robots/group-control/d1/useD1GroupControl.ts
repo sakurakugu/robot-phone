@@ -46,6 +46,8 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
   // entries 用 ref 管理，避免频繁 re-render
   const entriesRef = useRef<Map<string, WsEntry>>(new Map());
   const [connectedCount, setConnectedCount] = useState(0);
+  // 摇杆四轴缓存：[Axis0, Axis1, Axis2, Axis3]
+  const joystickAxesRef = useRef<[number, number, number, number]>([0, 0, 0, 0]);
 
   // 每次 ips 变化时，增/删 WebSocket 连接
   useEffect(() => {
@@ -101,6 +103,22 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
     }
   }, []);
 
+  const broadcastMergedJoystick = useCallback(
+    (mode: D1ControlMode, speed = 5) => {
+      const [axis0, axis1, axis2, axis3] = joystickAxesRef.current;
+      broadcast({
+        type: 'control_command',
+        data: {
+          command: 'joystick',
+          mode,
+          speed,
+          joystick: [axis0, axis1, axis2, axis3],
+        },
+      });
+    },
+    [broadcast],
+  );
+
   const sendJoystick = useCallback(
     (
       mode: D1ControlMode,
@@ -109,22 +127,38 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
       y: number,
       speed = 5,
     ) => {
-      broadcast({
-        type: 'control_command',
-        data: { command: 'joystick', mode, channel, x, y, speed },
-      });
+      if (mode === 'pose' || channel === 'pose') {
+        joystickAxesRef.current[2] = x;
+        joystickAxesRef.current[3] = y;
+      } else if (channel === 'look') {
+        // 移动模式右摇杆：水平轴（y）控制偏航
+        joystickAxesRef.current[2] = y;
+        joystickAxesRef.current[3] = 0;
+      } else {
+        joystickAxesRef.current[0] = x;
+        joystickAxesRef.current[1] = y;
+      }
+      broadcastMergedJoystick(mode, speed);
     },
-    [broadcast],
+    [broadcastMergedJoystick],
   );
 
   const sendJoystickStop = useCallback(
     (mode: D1ControlMode, channel?: D1JoystickChannel) => {
-      broadcast({
-        type: 'control_command',
-        data: { command: 'joystick_stop', mode, channel },
-      });
+      if (mode === 'pose' || channel === 'pose') {
+        joystickAxesRef.current[2] = 0;
+        joystickAxesRef.current[3] = 0;
+      } else if (channel === 'look') {
+        joystickAxesRef.current[2] = 0;
+        joystickAxesRef.current[3] = 0;
+      } else {
+        joystickAxesRef.current[0] = 0;
+        joystickAxesRef.current[1] = 0;
+      }
+      // 松开单摇杆时保留另一摇杆轴值
+      broadcastMergedJoystick(mode);
     },
-    [broadcast],
+    [broadcastMergedJoystick],
   );
 
   const sendAction = useCallback(

@@ -748,7 +748,7 @@ export function FirstInstallScreen() {
 
         <View style={styles.hintWrap}>
           <Text style={[styles.hintText, themedStyles.hint]}>
-            请确保手机已连接机器狗自带Wifi网络，密码在遥控器上
+            请确保手机和机器狗在同一局域网内
           </Text>
         </View>
 
