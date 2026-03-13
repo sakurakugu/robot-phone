@@ -31,9 +31,9 @@ const ALL_DISCOVER_ITEMS: NavItem[] = [
     route: '安装机器狗软件',
     adminOnly: false,
   },
-  { id: 'd1', title: '新能力中心(模板)', desc: '后续接入插件与技能商店' },
-  { id: 'd2', title: '任务模板(模板)', desc: '快速创建巡检/守卫任务' },
-  { id: 'd3', title: '场景联动(模板)', desc: '机器人 + 设备自动化' },
+  { id: 'd1', title: '新能力中心(占位)', desc: '后续接入插件与技能商店' },
+  { id: 'd2', title: '任务模板(占位)', desc: '快速创建巡检/守卫任务' },
+  { id: 'd3', title: '场景联动(占位)', desc: '机器人 + 设备自动化' },
 ];
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin']);
@@ -63,7 +63,7 @@ export function DiscoverScreen() {
   );
 
   return (
-    <Screen palette={palette} title="发现" subtitle="预留功能入口">
+    <Screen palette={palette} title="发现" subtitle="其他功能入口">
       <FlatList
         data={discoverItems}
         keyExtractor={item => item.id}

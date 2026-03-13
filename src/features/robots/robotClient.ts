@@ -69,9 +69,29 @@ export class RobotClient {
 
       return data;
     } catch (e: any) {
-      console.error(`机器人API错误 [${path}]:`, e);
+      if (!this.isExpectedOfflineError(e)) {
+        console.error(`机器人API错误 [${path}]:`, e);
+      }
       throw e;
     }
+  }
+
+  private isExpectedOfflineError(error: any) {
+    const name = String(error?.name || '');
+    const message = String(error?.message || '');
+    const text = `${name} ${message}`.toLowerCase();
+
+    return [
+      'aborterror',
+      'network request failed',
+      'failed to fetch',
+      'timeout',
+      'timed out',
+      'econnrefused',
+      'enetunreach',
+      'ehostunreach',
+      'socket hang up',
+    ].some(keyword => text.includes(keyword));
   }
 
   // Volume 音量
