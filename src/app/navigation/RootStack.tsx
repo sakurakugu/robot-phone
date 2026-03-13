@@ -25,6 +25,7 @@ import { RobotConfigScreen } from '../../features/robots/screens/机器人配置
 import { RoleFormScreen } from '../../features/roles/screens/RoleFormScreen';
 import { AddEnvironmentScreen } from '../../features/settings/screens/AddEnvironmentScreen';
 import { AppearanceScreen } from '../../features/settings/screens/AppearanceScreen';
+import { FeedbackScreen } from '../../features/settings/screens/FeedbackScreen';
 import { NetworkEnvironmentScreen } from '../../features/settings/screens/NetworkEnvironmentScreen';
 import { SettingsScreen } from '../../features/settings/screens/SettingsScreen';
 import { VersionHistoryScreen } from '../../features/settings/screens/VersionHistoryScreen';
@@ -75,6 +76,7 @@ export function RootStack() {
       <Stack.Screen name="X2 台词" component={X2TaiCiScreen} />
       <Stack.Screen name="X2 特技" component={X2TejiScreen} />
       <Stack.Screen name="设置" component={SettingsScreen} />
+      <Stack.Screen name="反馈" component={FeedbackScreen} />
       <Stack.Screen name="外观设置" component={AppearanceScreen} />
       <Stack.Screen name="服务器环境" component={NetworkEnvironmentScreen} />
       <Stack.Screen name="添加配置环境" component={AddEnvironmentScreen} />
