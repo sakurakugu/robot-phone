@@ -60,7 +60,7 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
 
   const activeThemeMode: ActiveThemeMode = useMemo(() => {
     if (themeMode === 'system') {
-      return systemScheme === 'dark' ? 'dark' : 'light';
+      return systemScheme === 'light' ? 'light' : 'dark';
     }
     return themeMode;
   }, [themeMode, systemScheme]);

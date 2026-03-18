@@ -3,9 +3,9 @@ import { Bot, Compass, User, Users } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { DiscoverScreen } from '../../features/discover/screens/发现屏幕';
-import { ProfileScreen } from '../../features/profile/screens/ProfileScreen';
+import { ProfileScreen } from '../../features/profile/screens/我的页面屏幕';
 import { RobotManagementScreen } from '../../features/robots/screens/机器人管理屏幕';
-import { RoleManagementScreen } from '../../features/roles/screens/RoleManagementScreen';
+import { RoleManagementScreen } from '../../features/roles/screens/角色管理屏幕';
 import { usePalette } from '../theme/palette';
 
 type TabName = '机器人' | '角色' | '发现' | '我的';
