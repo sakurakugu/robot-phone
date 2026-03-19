@@ -1,10 +1,10 @@
 import { getApiBaseUrl } from '../../shared/config/environment';
 import { http } from '../../shared/net/http';
 import {
-  getLocalRobot,
-  loadLocalRobots,
-  removeLocalRobot,
-  upsertLocalRobot,
+    getLocalRobot,
+    loadLocalRobots,
+    removeLocalRobot,
+    upsertLocalRobot,
 } from './localRobotStorage';
 import type { DiscoveredRobot, Robot, RobotForm } from './types';
 
@@ -186,6 +186,27 @@ export function getRobotConfig(uuid: string): Promise<any> {
 
 export function updateRobotConfig(uuid: string, config: any): Promise<any> {
   return http.post<any>(`/robots/${uuid}/config`, config);
+}
+
+export type RobotAudioRouteMode = 'robot' | 'phone' | 'mute';
+export type RobotAudioRouteFallback = 'drop' | 'robot';
+
+export type RobotAudioRouteConfig = {
+  mode: RobotAudioRouteMode;
+  targetPhoneDeviceId: string | null;
+  fallback: RobotAudioRouteFallback;
+  updatedAt: string;
+};
+
+export function getRobotAudioRoute(uuid: string): Promise<RobotAudioRouteConfig> {
+  return http.get<RobotAudioRouteConfig>(`/robots/${uuid}/audio-route`);
+}
+
+export function updateRobotAudioRoute(
+  uuid: string,
+  config: Partial<RobotAudioRouteConfig>,
+): Promise<RobotAudioRouteConfig> {
+  return http.put<RobotAudioRouteConfig>(`/robots/${uuid}/audio-route`, config);
 }
 
 /**

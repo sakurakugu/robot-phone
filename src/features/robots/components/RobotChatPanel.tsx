@@ -23,6 +23,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import RNBlobUtil from 'react-native-blob-util';
+import Video from 'react-native-video';
 import { usePalette } from '../../../app/theme/palette';
 import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
 import { VoiceRecordButton } from './VoiceRecordButton';
@@ -95,7 +97,12 @@ export function RobotChatPanel({
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<RobotChatMessage[]>([]);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [playUri, setPlayUri] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const tempAudioFilesRef = useRef<string[]>([]);
+  const isAudioPlayingRef = useRef(false);
+  const playedConversationRef = useRef<Set<string>>(new Set());
 
   const {
     isConnected,
@@ -159,6 +166,51 @@ export function RobotChatPanel({
     }),
     [palette],
   );
+
+  /** 播放队列中的下一条音频 */
+  const playNextAudio = useCallback(() => {
+    if (isAudioPlayingRef.current) return;
+    const next = audioQueueRef.current.shift();
+    if (!next) return;
+    isAudioPlayingRef.current = true;
+    setPlayUri(next);
+  }, []);
+
+  /** 将 base64 音频写入缓存并排队播放 */
+  const enqueueBase64Audio = useCallback(
+    async (base64: string, format?: string) => {
+      const normalized = (format || 'mp3').toLowerCase();
+      const ext =
+        normalized === 'wav' || normalized === 'aac' || normalized === 'm4a'
+          ? normalized
+          : 'mp3';
+      const filePath = `${RNBlobUtil.fs.dirs.CacheDir}/robot-tts-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+      try {
+        await RNBlobUtil.fs.writeFile(filePath, base64, 'base64');
+        tempAudioFilesRef.current.push(filePath);
+        audioQueueRef.current.push(`file://${filePath}`);
+        playNextAudio();
+      } catch {
+        // 写入失败直接跳过，避免阻塞聊天流程
+      }
+    },
+    [playNextAudio],
+  );
+
+  const finalizeCurrentAudio = useCallback(() => {
+    if (playUri) {
+      const path = playUri.replace(/^file:\/\//, '');
+      RNBlobUtil.fs.unlink(path).catch(() => {
+        // 缓存文件可能已被系统清理
+      });
+      tempAudioFilesRef.current = tempAudioFilesRef.current.filter(
+        p => p !== path,
+      );
+    }
+    setPlayUri(null);
+    isAudioPlayingRef.current = false;
+    playNextAudio();
+  }, [playNextAudio, playUri]);
 
   // 连接 / 断连
   useEffect(() => {
@@ -254,10 +306,55 @@ export function RobotChatPanel({
             },
           ];
         });
+        return;
+      }
+
+      if (data.type === 'audio_response') {
+        const conversationId =
+          typeof data.conversationId === 'string' ? data.conversationId : '';
+        if (
+          conversationId &&
+          playedConversationRef.current.has(conversationId)
+        ) {
+          return;
+        }
+
+        const base64 =
+          (typeof data.data?.buffer === 'string' && data.data.buffer) ||
+          (typeof data.data?.base64 === 'string' && data.data.base64) ||
+          '';
+
+        if (!base64) {
+          return;
+        }
+
+        if (conversationId) {
+          playedConversationRef.current.add(conversationId);
+          if (playedConversationRef.current.size > 200) {
+            const entries = Array.from(playedConversationRef.current);
+            playedConversationRef.current = new Set(entries.slice(-100));
+          }
+        }
+
+        enqueueBase64Audio(base64, data.data?.format);
       }
     });
     return unsubscribe;
-  }, [onMessage]);
+  }, [enqueueBase64Audio, onMessage]);
+
+  useEffect(() => {
+    return () => {
+      for (const path of tempAudioFilesRef.current) {
+        RNBlobUtil.fs.unlink(path).catch(() => {
+          // 卸载时忽略清理失败
+        });
+      }
+      tempAudioFilesRef.current = [];
+      audioQueueRef.current = [];
+      isAudioPlayingRef.current = false;
+      playedConversationRef.current.clear();
+    };
+  }, []);
 
   // 消息变化时滚动到底部
   useEffect(() => {
@@ -510,6 +607,19 @@ export function RobotChatPanel({
           </Pressable>
         </View>
       </View>
+
+      {playUri ? (
+        <Video
+          source={{ uri: playUri }}
+          paused={false}
+          playInBackground={false}
+          playWhenInactive={false}
+          ignoreSilentSwitch="ignore"
+          onEnd={finalizeCurrentAudio}
+          onError={finalizeCurrentAudio}
+          style={styles.hiddenAudio}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -640,5 +750,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 12,
+  },
+  hiddenAudio: {
+    width: 0,
+    height: 0,
+    position: 'absolute',
+    left: -9999,
+    top: -9999,
   },
 });

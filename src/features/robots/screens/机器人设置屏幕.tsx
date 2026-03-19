@@ -9,22 +9,25 @@ import { Screen } from '../../../shared/ui/Screen';
 import { versionCodeToSemver } from '../../settings/services/updateService';
 import type { ActivePackageInfo, PackageType } from '../api';
 import {
-  fetchRobot,
-  getActivePackage,
-  getPackageDownloadUrl,
-  updateRobot,
+    fetchRobot,
+    getActivePackage,
+    getPackageDownloadUrl,
+    getRobotAudioRoute,
+    updateRobot,
+    updateRobotAudioRoute,
 } from '../api';
 import {
-  ActionRow,
-  InfoRow,
-  InputRow,
-  Section,
+    ActionRow,
+    InfoRow,
+    InputRow,
+    Section,
 } from '../components/SettingsComponents';
+import { getOrCreatePhoneDeviceId } from '../phoneIdentity';
 import { RobotClient } from '../robotClient';
 import {
-  installPackageFromBase64,
-  PACKAGE_INSTALL_ORDER,
-  PACKAGE_INSTALL_SPECS,
+    installPackageFromBase64,
+    PACKAGE_INSTALL_ORDER,
+    PACKAGE_INSTALL_SPECS,
 } from '../services/机器人软件包安装服务';
 import type { RobotForm } from '../types';
 
@@ -224,6 +227,7 @@ export function RobotSettingsScreen() {
   // 音量状态
   const [volume, setVolume] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [audioRouteText, setAudioRouteText] = useState('未加载');
 
   const withLoading = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -284,9 +288,33 @@ export function RobotSettingsScreen() {
     });
   }, [robotUuid, withLoading]);
 
+  const loadAudioRoute = useCallback(async () => {
+    try {
+      const routeConfig = await getRobotAudioRoute(robotUuid);
+      const modeText =
+        routeConfig.mode === 'phone'
+          ? '手机播报'
+          : routeConfig.mode === 'mute'
+            ? '静默'
+            : '机器狗播报';
+      const targetText = routeConfig.targetPhoneDeviceId
+        ? routeConfig.targetPhoneDeviceId.slice(0, 8)
+        : '-';
+      setAudioRouteText(
+        `${modeText} / 目标:${targetText} / 回退:${routeConfig.fallback}`,
+      );
+    } catch {
+      setAudioRouteText('读取失败');
+    }
+  }, [robotUuid]);
+
   useEffect(() => {
     loadRobot();
   }, [loadRobot]);
+
+  useEffect(() => {
+    loadAudioRoute();
+  }, [loadAudioRoute]);
 
   useEffect(() => {
     setDownloadedPackagePaths({});
@@ -336,6 +364,31 @@ export function RobotSettingsScreen() {
     await withLoading(async () => {
       await client.markLog('手动标记');
       setMessage('日志标记已写入');
+    });
+  };
+
+  const handleSetCurrentPhoneAsAudioTarget = async () => {
+    await withLoading(async () => {
+      const phoneDeviceId = await getOrCreatePhoneDeviceId();
+      await updateRobotAudioRoute(robotUuid, {
+        mode: 'phone',
+        targetPhoneDeviceId: phoneDeviceId,
+        fallback: 'robot',
+      });
+      await loadAudioRoute();
+      setMessage('已将当前手机设为云端语音播报目标');
+    });
+  };
+
+  const handleSetRobotAsAudioTarget = async () => {
+    await withLoading(async () => {
+      await updateRobotAudioRoute(robotUuid, {
+        mode: 'robot',
+        targetPhoneDeviceId: null,
+        fallback: 'robot',
+      });
+      await loadAudioRoute();
+      setMessage('已切回机器狗本体播报');
     });
   };
 
@@ -562,6 +615,23 @@ export function RobotSettingsScreen() {
           <ActionRow
             label="保存基本信息"
             onPress={handleSaveBasic}
+            loading={loading}
+            isLast
+          />
+        </Section>
+
+        <Section title="云端语音路由">
+          <InfoRow label="当前策略" value={audioRouteText} />
+          <ActionRow
+            label="设为当前手机播报"
+            subtitle="云端 TTS 将优先发给本机，再由本机外放/蓝牙播放"
+            onPress={handleSetCurrentPhoneAsAudioTarget}
+            loading={loading}
+          />
+          <ActionRow
+            label="切回机器狗播报"
+            subtitle="恢复发到机器狗本体"
+            onPress={handleSetRobotAsAudioTarget}
             loading={loading}
             isLast
           />

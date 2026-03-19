@@ -19,18 +19,26 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveEnvironment } from '../../../shared/config/environment';
+import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../phoneIdentity';
 
 // 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）
 const WS_CHAT_PATH = '/api/v1/phone/business';
 const WS_AUDIO_UPLOAD_PATH = '/api/v1/phone/audio/upload';
+const WS_AUDIO_DOWNLOAD_PATH = '/api/v1/phone/audio/download';
 const CONNECT_TIMEOUT_MS = 8000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY_MS = 2000; // 指数退避：2s, 4s, 8s, 16s, 32s
+
+type PhoneIdentity = {
+  phoneSessionId: string;
+  phoneDeviceId: string;
+};
 
 export type WsMessage = {
   type: string;
   robotId?: string;
   timestamp: number;
+  conversationId?: string;
   data?: any;
 };
 
@@ -72,14 +80,15 @@ export type UseRobotWebSocketResult = {
 };
 
 /** 将 http/https baseUrl 转为对应的 ws/wss URL，并拼接路径 */
-function toWsUrl(baseUrl: string, path: string, robotId: string): string {
+function toWsUrl(baseUrl: string, path: string, robotId: string, identity: PhoneIdentity): string {
   const wsBase = baseUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
-  return `${wsBase}${path}?robotId=${robotId}&role=ui`;
+  return `${wsBase}${path}?robotId=${robotId}&role=ui&phoneSessionId=${identity.phoneSessionId}&phoneDeviceId=${identity.phoneDeviceId}`;
 }
 
 export function useRobotWebSocket(): UseRobotWebSocketResult {
   const wsRef = useRef<WebSocket | null>(null);
   const wsAudioRef = useRef<WebSocket | null>(null);
+  const wsAudioDownloadRef = useRef<WebSocket | null>(null);
   const robotIdRef = useRef<string>('');
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
@@ -113,6 +122,11 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
       wsAudioRef.current.onclose = null;
       wsAudioRef.current.close();
       wsAudioRef.current = null;
+    }
+    if (wsAudioDownloadRef.current) {
+      wsAudioDownloadRef.current.onclose = null;
+      wsAudioDownloadRef.current.close();
+      wsAudioDownloadRef.current = null;
     }
     setIsConnected(false);
     setIsAudioUploadConnected(false);
@@ -180,17 +194,42 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
 
       // 使用环境配置的 baseUrl 自动派生 WebSocket 地址
       const serverBase = getActiveEnvironment().baseUrl;
-      openSocket(robotId, toWsUrl(serverBase, WS_CHAT_PATH, robotId));
+      const phoneDeviceId = await getOrCreatePhoneDeviceId();
+      const identity: PhoneIdentity = {
+        phoneSessionId: getPhoneSessionId(),
+        phoneDeviceId,
+      };
+      openSocket(robotId, toWsUrl(serverBase, WS_CHAT_PATH, robotId, identity));
 
       // 音频上传通道（独立连接，不影响业务通道）
       try {
-        const audioWs = new WebSocket(toWsUrl(serverBase, WS_AUDIO_UPLOAD_PATH, robotId));
+        const audioWs = new WebSocket(toWsUrl(serverBase, WS_AUDIO_UPLOAD_PATH, robotId, identity));
         wsAudioRef.current = audioWs;
         audioWs.onopen = () => setIsAudioUploadConnected(true);
         audioWs.onclose = () => { setIsAudioUploadConnected(false); wsAudioRef.current = null; };
         audioWs.onerror = () => { /* 等待 onclose */ };
       } catch {
         console.warn('[useRobotWebSocket] 音频上传通道连接失败');
+      }
+
+      // 音频下载通道（用于接收云端 TTS 分片）
+      try {
+        const audioDownloadWs = new WebSocket(toWsUrl(serverBase, WS_AUDIO_DOWNLOAD_PATH, robotId, identity));
+        wsAudioDownloadRef.current = audioDownloadWs;
+        audioDownloadWs.onmessage = (event: WsMessageEvent) => {
+          try {
+            const raw = event.data;
+            if (!raw) return;
+            const data: WsMessage = JSON.parse(
+              typeof raw === 'string' ? raw : raw.toString(),
+            );
+            handlersRef.current.forEach(h => h(data));
+          } catch { /* 忽略解析错误 */ }
+        };
+        audioDownloadWs.onclose = () => { wsAudioDownloadRef.current = null; };
+        audioDownloadWs.onerror = () => { /* 等待 onclose */ };
+      } catch {
+        console.warn('[useRobotWebSocket] 音频下载通道连接失败');
       }
     },
     [disconnect, openSocket],
