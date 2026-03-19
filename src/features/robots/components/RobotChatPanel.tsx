@@ -1,27 +1,27 @@
 import {
-  // BrainCircuit,
-  Bot,
-  Send,
+    // BrainCircuit,
+    Bot,
+    Send,
 } from 'lucide-react-native';
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
 import Video from 'react-native-video';
@@ -42,6 +42,16 @@ export type RobotChatMessage = {
   actions?: string[];
   /** 等待服务器回复中 */
   loading?: boolean;
+};
+
+type AudioStreamState = {
+  sessionId: string;
+  format: string;
+  nextSeq: number;
+  pendingBySeq: Map<number, string>;
+  stagedChunks: string[];
+  started: boolean;
+  conversationId: string;
 };
 
 type RobotChatPanelProps = {
@@ -103,6 +113,8 @@ export function RobotChatPanel({
   const tempAudioFilesRef = useRef<string[]>([]);
   const isAudioPlayingRef = useRef(false);
   const playedConversationRef = useRef<Set<string>>(new Set());
+  const streamConversationRef = useRef<Set<string>>(new Set());
+  const audioStreamRef = useRef<Map<string, AudioStreamState>>(new Map());
 
   const {
     isConnected,
@@ -212,6 +224,49 @@ export function RobotChatPanel({
     playNextAudio();
   }, [playNextAudio, playUri]);
 
+  const flushStreamAudio = useCallback(
+    (sessionId: string, force = false) => {
+      const streamState = audioStreamRef.current.get(sessionId);
+      if (!streamState) {
+        return;
+      }
+      const minChunks = 1;
+      if (!force && streamState.stagedChunks.length < minChunks) {
+        return;
+      }
+      const toPlay = force
+        ? streamState.stagedChunks.splice(0, streamState.stagedChunks.length)
+        : streamState.stagedChunks.splice(0, minChunks);
+      if (toPlay.length === 0) {
+        return;
+      }
+      streamState.started = true;
+      for (const base64 of toPlay) {
+        enqueueBase64Audio(base64, streamState.format);
+      }
+    },
+    [enqueueBase64Audio],
+  );
+
+  const consumeStreamChunks = useCallback(
+    (sessionId: string) => {
+      const streamState = audioStreamRef.current.get(sessionId);
+      if (!streamState) {
+        return;
+      }
+      while (streamState.pendingBySeq.has(streamState.nextSeq)) {
+        const chunk = streamState.pendingBySeq.get(streamState.nextSeq);
+        streamState.pendingBySeq.delete(streamState.nextSeq);
+        streamState.nextSeq += 1;
+        if (chunk) {
+          streamState.stagedChunks.push(chunk);
+        }
+      }
+      flushStreamAudio(sessionId);
+    },
+    [flushStreamAudio],
+  );
+
   // 连接 / 断连
   useEffect(() => {
     if (robotUuid) {
@@ -314,7 +369,8 @@ export function RobotChatPanel({
           typeof data.conversationId === 'string' ? data.conversationId : '';
         if (
           conversationId &&
-          playedConversationRef.current.has(conversationId)
+          (playedConversationRef.current.has(conversationId) ||
+            streamConversationRef.current.has(conversationId))
         ) {
           return;
         }
@@ -337,12 +393,82 @@ export function RobotChatPanel({
         }
 
         enqueueBase64Audio(base64, data.data?.format);
+        return;
+      }
+
+      if (data.type === 'audio_stream_start') {
+        const sessionId =
+          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
+        if (!sessionId) {
+          return;
+        }
+        const conversationId =
+          typeof data.conversationId === 'string' ? data.conversationId : '';
+        if (conversationId) {
+          streamConversationRef.current.add(conversationId);
+          if (streamConversationRef.current.size > 200) {
+            const entries = Array.from(streamConversationRef.current);
+            streamConversationRef.current = new Set(entries.slice(-100));
+          }
+        }
+        audioStreamRef.current.set(sessionId, {
+          sessionId,
+          format:
+            typeof data.data?.format === 'string' && data.data.format
+              ? data.data.format
+              : 'mp3',
+          nextSeq: 1,
+          pendingBySeq: new Map<number, string>(),
+          stagedChunks: [],
+          started: false,
+          conversationId,
+        });
+        return;
+      }
+
+      if (data.type === 'audio_stream_chunk') {
+        const sessionId =
+          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
+        const buffer =
+          typeof data.data?.buffer === 'string' ? data.data.buffer : '';
+        if (!sessionId || !buffer) {
+          return;
+        }
+        const seqNumber = Number(data.data?.seq);
+        const seq = Number.isFinite(seqNumber) && seqNumber > 0 ? seqNumber : 0;
+        const streamState = audioStreamRef.current.get(sessionId);
+        if (!streamState || seq === 0) {
+          return;
+        }
+        streamState.pendingBySeq.set(seq, buffer);
+        consumeStreamChunks(sessionId);
+        return;
+      }
+
+      if (data.type === 'audio_stream_end') {
+        const sessionId =
+          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
+        if (!sessionId) {
+          return;
+        }
+        consumeStreamChunks(sessionId);
+        flushStreamAudio(sessionId, true);
+        const streamState = audioStreamRef.current.get(sessionId);
+        if (streamState?.conversationId) {
+          playedConversationRef.current.add(streamState.conversationId);
+          if (playedConversationRef.current.size > 200) {
+            const entries = Array.from(playedConversationRef.current);
+            playedConversationRef.current = new Set(entries.slice(-100));
+          }
+        }
+        audioStreamRef.current.delete(sessionId);
       }
     });
     return unsubscribe;
-  }, [enqueueBase64Audio, onMessage]);
+  }, [consumeStreamChunks, enqueueBase64Audio, flushStreamAudio, onMessage]);
 
   useEffect(() => {
+    const audioStreamStates = audioStreamRef.current;
     return () => {
       for (const path of tempAudioFilesRef.current) {
         RNBlobUtil.fs.unlink(path).catch(() => {
@@ -353,6 +479,8 @@ export function RobotChatPanel({
       audioQueueRef.current = [];
       isAudioPlayingRef.current = false;
       playedConversationRef.current.clear();
+      streamConversationRef.current.clear();
+      audioStreamStates.clear();
     };
   }, []);
 

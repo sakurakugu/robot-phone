@@ -49,6 +49,7 @@ export type TtsOptions = {
   speed?: number;
   pitch?: number;
   volume?: number;
+  stream?: boolean;
 };
 
 type WsMessageEvent = {
@@ -246,7 +247,12 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
   /** 发送文本给大模型 */
   const sendToAI = useCallback(
     (text: string, ttsOptions: TtsOptions = {}) => {
-      sendRaw({ type: 'text_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { text, ttsOptions } });
+      sendRaw({
+        type: 'text_input',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: { text, ttsOptions: { stream: true, ...ttsOptions } },
+      });
     },
     [sendRaw],
   );
@@ -254,7 +260,12 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
   /** 直接合成 TTS 推送到机器狗 */
   const sendToRobot = useCallback(
     (text: string, ttsOptions: TtsOptions = {}) => {
-      sendRaw({ type: 'tts_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { text, ttsOptions } });
+      sendRaw({
+        type: 'tts_input',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: { text, ttsOptions: { stream: true, ...ttsOptions } },
+      });
     },
     [sendRaw],
   );
