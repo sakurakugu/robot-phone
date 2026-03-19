@@ -13,6 +13,7 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -34,6 +35,7 @@ export type RobotChatMessage = {
   role: 'user' | 'ai';
   target?: MessageTarget;
   text: string;
+  imageUrl?: string;
   timestamp: number;
   actions?: string[];
   /** 等待服务器回复中 */
@@ -210,6 +212,11 @@ export function RobotChatPanel({
 
       if (data.type === 'text_response') {
         const ts = Date.now();
+        const visionImageBase64 = data.data?.visionImage?.base64;
+        const visionImageFormat = data.data?.visionImage?.format || 'jpeg';
+        const imageUrl = visionImageBase64
+          ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
+          : undefined;
         setMessages(prev => {
           const filtered = prev.filter(m => !m.loading);
           return [
@@ -218,6 +225,7 @@ export function RobotChatPanel({
               id: `ai-${ts}`,
               role: 'ai',
               text: data.data?.text || '',
+              imageUrl,
               timestamp: ts,
               actions: data.data?.actions,
             },
@@ -380,6 +388,12 @@ export function RobotChatPanel({
             >
               {item.text}
             </Text>
+            {item.imageUrl && (
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.messageImage}
+              />
+            )}
             {item.actions && item.actions.length > 0 && (
               <View style={styles.actionTags}>
                 <Text
@@ -577,6 +591,12 @@ const styles = StyleSheet.create({
   },
   messageText: {
     lineHeight: 20,
+  },
+  messageImage: {
+    width: 220,
+    height: 160,
+    marginTop: 8,
+    borderRadius: 8,
   },
   footer: {
     flexDirection: 'row',
