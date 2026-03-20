@@ -19,12 +19,12 @@
  */
 
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
 import { getActiveEnvironment } from '../../shared/config/environment';
 
@@ -34,15 +34,18 @@ const RECONNECT_BASE_DELAY_MS = 2000;
 const RECONNECT_MAX_DELAY_MS = 30000; // 最长重连间隔 30s
 
 /**
+ * TODO: 改成uuidv7
  * 生成简单的 UUID v4（用于标识本次 App 会话）。
  * 整个 App 生命周期仅生成一次，重连时复用同一 ID，
  * 避免服务器每次重连都写入新的幽灵记录。
  */
 function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
+    if (c === 'x') {
+      return Math.floor(Math.random() * 16).toString(16);
+    }
+    const yCandidates = ['8', '9', 'a', 'b'];
+    return yCandidates[Math.floor(Math.random() * yCandidates.length)];
   });
 }
 
@@ -56,7 +59,7 @@ type ServerConnectionContextValue = {
 
 const ServerConnectionContext = createContext<ServerConnectionContextValue>({
   isConnected: false,
-  reconnect: () => {},
+  reconnect: () => { },
 });
 
 /** 将 http/https baseUrl 转为对应的 ws/wss URL（手机独立通道，不含 robotId） */

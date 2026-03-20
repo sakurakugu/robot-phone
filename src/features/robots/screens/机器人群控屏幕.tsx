@@ -175,7 +175,8 @@ export function RobotGroupControlScreen() {
               <Text
                 style={[
                   styles.desc,
-                  { color: palette.textMuted, textAlign: 'center' },
+                  styles.centerText,
+                  { color: palette.textMuted },
                 ]}
               >
                 暂无工程，点击右侧 ＋ 添加
@@ -227,7 +228,8 @@ export function RobotGroupControlScreen() {
             <Text
               style={[
                 styles.desc,
-                { color: palette.textMuted, textAlign: 'center' },
+                styles.centerText,
+                { color: palette.textMuted },
               ]}
             >
               点击进入播放 · 长按删除
@@ -275,6 +277,9 @@ const styles = StyleSheet.create({
   desc: {
     fontSize: 12,
     marginTop: 4,
+  },
+  centerText: {
+    textAlign: 'center',
   },
   coming: {
     fontSize: 11,

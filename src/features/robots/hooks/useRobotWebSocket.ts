@@ -17,7 +17,7 @@
  * WebSocket 地址自动派生：从环境配置的 baseUrl 派生为 ws:// 或 wss:// 前缀
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getActiveEnvironment } from '../../../shared/config/environment';
 import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../phoneIdentity';
 
@@ -337,8 +337,34 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
     };
   }, [disconnect]);
 
-  return {
-    isConnected, connect, disconnect, sendToAI, sendToRobot, sendAction, sendRaw, onMessage,
-    isAudioUploadConnected, sendAudioStart, sendAudioChunk, sendAudioEnd,
-  };
+  return useMemo(
+    () => ({
+      isConnected,
+      connect,
+      disconnect,
+      sendToAI,
+      sendToRobot,
+      sendAction,
+      sendRaw,
+      onMessage,
+      isAudioUploadConnected,
+      sendAudioStart,
+      sendAudioChunk,
+      sendAudioEnd,
+    }),
+    [
+      connect,
+      disconnect,
+      isAudioUploadConnected,
+      isConnected,
+      onMessage,
+      sendAction,
+      sendAudioChunk,
+      sendAudioEnd,
+      sendAudioStart,
+      sendRaw,
+      sendToAI,
+      sendToRobot,
+    ],
+  );
 }

@@ -168,7 +168,7 @@ export function UpdateDialog({ visible, updateInfo, onClose }: Props) {
 
           {/* 错误 */}
           {error && (
-            <Text style={[styles.errorText, { color: '#e53935' }]}>
+            <Text style={[styles.errorText, styles.errorTextDanger]}>
               {error}
             </Text>
           )}
@@ -197,7 +197,7 @@ export function UpdateDialog({ visible, updateInfo, onClose }: Props) {
                 ]}
                 onPress={handleDownload}
               >
-                <Text style={[styles.btnText, { color: '#fff' }]}>
+                <Text style={[styles.btnText, styles.btnTextLight]}>
                   立即更新
                 </Text>
               </Pressable>
@@ -206,13 +206,12 @@ export function UpdateDialog({ visible, updateInfo, onClose }: Props) {
                 style={[
                   styles.btn,
                   styles.btnPrimary,
-                  { backgroundColor: palette.primary, opacity: 0.7 },
+                  styles.btnPrimaryDisabled,
+                  { backgroundColor: palette.primary },
                 ]}
               >
                 <ActivityIndicator size="small" color="#fff" />
-                <Text
-                  style={[styles.btnText, { color: '#fff', marginLeft: 6 }]}
-                >
+                <Text style={[styles.btnText, styles.btnTextLight, styles.btnTextWithGap]}>
                   下载中...
                 </Text>
               </View>
@@ -321,6 +320,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  errorTextDanger: {
+    color: '#e53935',
+  },
   buttons: {
     flexDirection: 'row',
     gap: 12,
@@ -341,5 +343,14 @@ const styles = StyleSheet.create({
   btnText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  btnTextLight: {
+    color: '#fff',
+  },
+  btnTextWithGap: {
+    marginLeft: 6,
+  },
+  btnPrimaryDisabled: {
+    opacity: 0.7,
   },
 });

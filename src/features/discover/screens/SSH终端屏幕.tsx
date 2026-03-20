@@ -7,7 +7,7 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -211,6 +211,10 @@ export function SSHTerminalScreen() {
   const statusColor = isConnected
     ? (palette.success ?? '#22c55e')
     : palette.textMuted;
+  const modeBtnTextInactive = useMemo(
+    () => ({ color: palette.textMuted }),
+    [palette.textMuted],
+  );
 
   return (
     <Screen palette={palette} subtitle="通过 SSH 执行远程命令" unsafeTop={true}>
@@ -442,10 +446,9 @@ export function SSHTerminalScreen() {
                 <Text
                   style={[
                     styles.modeBtnText,
-                    {
-                      color:
-                        inputMode === 'single' ? '#fff' : palette.textMuted,
-                    },
+                    inputMode === 'single'
+                      ? styles.modeBtnTextActive
+                      : modeBtnTextInactive,
                   ]}
                 >
                   单条
@@ -465,9 +468,9 @@ export function SSHTerminalScreen() {
                 <Text
                   style={[
                     styles.modeBtnText,
-                    {
-                      color: inputMode === 'batch' ? '#fff' : palette.textMuted,
-                    },
+                    inputMode === 'batch'
+                      ? styles.modeBtnTextActive
+                      : modeBtnTextInactive,
                   ]}
                 >
                   批量
@@ -697,6 +700,9 @@ const styles = StyleSheet.create({
   modeBtnText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  modeBtnTextActive: {
+    color: '#fff',
   },
   clearBtn: {
     padding: 6,

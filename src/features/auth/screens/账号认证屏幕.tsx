@@ -79,7 +79,7 @@ export function AuthScreen() {
               style={[
                 styles.tabText,
                 mode === 'login'
-                  ? { color: palette.primary, fontWeight: '700' }
+                  ? [themed.tabActive, styles.tabTextActive]
                   : themed.tabInactive,
               ]}
             >
@@ -97,7 +97,7 @@ export function AuthScreen() {
               style={[
                 styles.tabText,
                 mode === 'register'
-                  ? { color: palette.primary, fontWeight: '700' }
+                  ? [themed.tabActive, styles.tabTextActive]
                   : themed.tabInactive,
               ]}
             >
@@ -210,6 +210,9 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 15,
+  },
+  tabTextActive: {
+    fontWeight: '700',
   },
   input: {
     borderWidth: 1,

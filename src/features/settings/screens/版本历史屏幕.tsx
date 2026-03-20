@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -29,6 +29,26 @@ export function VersionHistoryScreen() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [showRawMap, setShowRawMap] = useState<Record<number, boolean>>({});
+  const themedStyles = useMemo(
+    () => ({
+      card: { backgroundColor: palette.surface, borderColor: palette.border },
+      versionName: { color: palette.text },
+      channelBadgeStable: { backgroundColor: palette.primary },
+      activeBadge: { backgroundColor: '#4caf50' },
+      metaText: { color: palette.textMuted },
+      progressBg: { backgroundColor: palette.border },
+      progressFill: { backgroundColor: palette.primary },
+      installBtn: { backgroundColor: palette.primary },
+      tabActive: { backgroundColor: palette.primary },
+      tabInactive: { backgroundColor: palette.surfaceAlt },
+      tabTextActive: { color: '#fff' },
+      tabTextInactive: { color: palette.text },
+      container: { backgroundColor: palette.background },
+      emptyText: { color: palette.textMuted },
+      loadingColor: palette.primary,
+    }),
+    [palette],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,10 +98,7 @@ export function VersionHistoryScreen() {
         : versionCodeToSemver(item.versionCode);
       return (
         <View
-          style={[
-            styles.card,
-            { backgroundColor: palette.surface, borderColor: palette.border },
-          ]}
+          style={[styles.card, themedStyles.card]}
         >
           <View style={styles.cardHeader}>
             <View style={styles.versionRow}>
@@ -93,17 +110,16 @@ export function VersionHistoryScreen() {
                   }));
                 }}
               >
-                <Text style={[styles.versionName, { color: palette.text }]}>
+                <Text style={[styles.versionName, themedStyles.versionName]}>
                   v{displayVersion}
                 </Text>
               </Pressable>
               <View
                 style={[
                   styles.channelBadge,
-                  {
-                    backgroundColor:
-                      item.channel === 'beta' ? '#ff9800' : palette.primary,
-                  },
+                  item.channel === 'beta'
+                    ? styles.channelBadgeBeta
+                    : themedStyles.channelBadgeStable,
                 ]}
               >
                 <Text style={styles.channelText}>
@@ -111,14 +127,12 @@ export function VersionHistoryScreen() {
                 </Text>
               </View>
               {item.isActive && (
-                <View
-                  style={[styles.activeBadge, { backgroundColor: '#4caf50' }]}
-                >
+                <View style={[styles.activeBadge, themedStyles.activeBadge]}>
                   <Text style={styles.channelText}>当前</Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.meta, { color: palette.textMuted }]}>
+            <Text style={[styles.meta, themedStyles.metaText]}>
               版本号 {item.versionCode} · {formatFileSize(item.fileSize)} ·{' '}
               {new Date(item.uploadedAt).toLocaleDateString('zh-CN')}
             </Text>
@@ -126,7 +140,7 @@ export function VersionHistoryScreen() {
 
           {item.changelog ? (
             <Text
-              style={[styles.changelog, { color: palette.textMuted }]}
+              style={[styles.changelog, themedStyles.metaText]}
               numberOfLines={3}
             >
               {item.changelog}
@@ -138,33 +152,25 @@ export function VersionHistoryScreen() {
             {isDownloading ? (
               <View style={styles.progressRow}>
                 <View
-                  style={[
-                    styles.progressBg,
-                    { backgroundColor: palette.border },
-                  ]}
+                  style={[styles.progressBg, themedStyles.progressBg]}
                 >
                   <View
                     style={[
                       styles.progressFill,
-                      {
-                        backgroundColor: palette.primary,
-                        width: `${progressPercent}%`,
-                      },
+                      themedStyles.progressFill,
+                      { width: `${progressPercent}%` },
                     ]}
                   />
                 </View>
                 <Text
-                  style={[styles.progressText, { color: palette.textMuted }]}
+                  style={[styles.progressText, themedStyles.metaText]}
                 >
                   {progressPercent}%
                 </Text>
               </View>
             ) : (
               <Pressable
-                style={[
-                  styles.installBtn,
-                  { backgroundColor: palette.primary },
-                ]}
+                style={[styles.installBtn, themedStyles.installBtn]}
                 onPress={() => handleInstall(item)}
                 disabled={downloadingId !== null}
               >
@@ -175,7 +181,7 @@ export function VersionHistoryScreen() {
         </View>
       );
     },
-    [palette, downloadingId, progress, handleInstall, showRawMap],
+    [themedStyles, downloadingId, progress, handleInstall, showRawMap],
   );
 
   const TABS: { key: FilterTab; label: string }[] = [
@@ -185,7 +191,7 @@ export function VersionHistoryScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.background }]}>
+    <View style={[styles.container, themedStyles.container]}>
       {/* 过滤标签 */}
       <View style={styles.tabs}>
         {TABS.map(tab => (
@@ -193,17 +199,16 @@ export function VersionHistoryScreen() {
             key={tab.key}
             style={[
               styles.tab,
-              {
-                backgroundColor:
-                  filter === tab.key ? palette.primary : palette.surfaceAlt,
-              },
+              filter === tab.key ? themedStyles.tabActive : themedStyles.tabInactive,
             ]}
             onPress={() => setFilter(tab.key)}
           >
             <Text
               style={[
                 styles.tabText,
-                { color: filter === tab.key ? '#fff' : palette.text },
+                filter === tab.key
+                  ? themedStyles.tabTextActive
+                  : themedStyles.tabTextInactive,
               ]}
             >
               {tab.label}
@@ -214,11 +219,11 @@ export function VersionHistoryScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={palette.primary} />
+          <ActivityIndicator size="large" color={themedStyles.loadingColor} />
         </View>
       ) : versions.length === 0 ? (
         <View style={styles.center}>
-          <Text style={{ color: palette.textMuted }}>暂无版本记录</Text>
+          <Text style={themedStyles.emptyText}>暂无版本记录</Text>
         </View>
       ) : (
         <FlatList
@@ -276,6 +281,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  channelBadgeBeta: {
+    backgroundColor: '#ff9800',
   },
   activeBadge: {
     paddingHorizontal: 6,

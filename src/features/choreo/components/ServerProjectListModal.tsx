@@ -115,7 +115,7 @@ export function ServerProjectListModal({
       transparent
       onRequestClose={onClose}
     >
-      <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+      <View style={[styles.overlay, styles.overlayDim]}>
         <View
           style={[styles.container, { backgroundColor: palette.background }]}
         >
@@ -275,6 +275,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  overlayDim: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   container: {
     maxHeight: '80%',

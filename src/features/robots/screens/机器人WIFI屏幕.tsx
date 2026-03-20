@@ -35,6 +35,7 @@ export function RobotWifiScreen() {
       modalSignalText: { color: palette.textMuted },
       modalClose: { backgroundColor: palette.surfaceAlt },
       modalCloseText: { color: palette.text },
+      modalHeaderText: { color: palette.text },
     }),
     [palette],
   );
@@ -186,24 +187,19 @@ export function RobotWifiScreen() {
         <View style={[styles.modalOverlay, themedStyles.modalOverlay]}>
           <View style={[styles.modalContent, themedStyles.modalContent]}>
             <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}
+              style={styles.modalHeader}
             >
               <Text
                 style={[
                   styles.modalTitle,
                   themedStyles.modalTitle,
-                  { marginBottom: 0 },
+                  styles.modalTitleNoBottom,
                 ]}
               >
                 WiFi 列表
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ marginRight: 8, color: palette.text }}>
+              <View style={styles.modalHeaderRight}>
+                <Text style={[styles.modalHeaderLabel, themedStyles.modalHeaderText]}>
                   聚合
                 </Text>
                 <Switch value={groupBySSID} onValueChange={setGroupBySSID} />
@@ -271,6 +267,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  modalTitleNoBottom: {
+    marginBottom: 0,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalHeaderLabel: {
+    marginRight: 8,
   },
   modalItem: {
     paddingVertical: 12,

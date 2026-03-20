@@ -38,7 +38,7 @@ export function PersonalCenterScreen() {
         )}
       />
 
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+      <View style={styles.logoutCardWrap}>
         <InfoCard
           title="退出登录"
           desc="当前账号将切换到游客模式"
@@ -61,5 +61,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 10,
     marginTop: 10,
+  },
+  logoutCardWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
 });

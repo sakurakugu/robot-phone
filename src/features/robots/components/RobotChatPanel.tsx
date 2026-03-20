@@ -1,27 +1,27 @@
 import {
-    // BrainCircuit,
-    Bot,
-    Send,
+  // BrainCircuit,
+  Bot,
+  Send,
 } from 'lucide-react-native';
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
 import Video from 'react-native-video';
@@ -38,6 +38,13 @@ export type RobotChatMessage = {
   target?: MessageTarget;
   text: string;
   imageUrl?: string;
+  targetPosition?: {
+    label: string;
+    cx: number;
+    cy: number;
+    w: number;
+    h: number;
+  };
   timestamp: number;
   actions?: string[];
   /** 等待服务器回复中 */
@@ -92,6 +99,30 @@ function formatTime(ts: number): string {
   const ss = String(d.getSeconds()).padStart(2, '00');
   return `${hh}:${mm}:${ss}`;
 }
+
+const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
+const MESSAGE_IMAGE_WIDTH = 220;
+const MESSAGE_IMAGE_HEIGHT = 160;
+
+const buildTargetBoxStyle = (
+  target: NonNullable<RobotChatMessage['targetPosition']>,
+) => {
+  const cx = clampUnit(target.cx);
+  const cy = clampUnit(target.cy);
+  const width = clampUnit(target.w);
+  const height = clampUnit(target.h);
+  const left = clampUnit(cx - width / 2);
+  const top = clampUnit(cy - height / 2);
+  const boundedWidth = clampUnit(Math.min(width, 1 - left));
+  const boundedHeight = clampUnit(Math.min(height, 1 - top));
+
+  return {
+    left: left * MESSAGE_IMAGE_WIDTH,
+    top: top * MESSAGE_IMAGE_HEIGHT,
+    width: boundedWidth * MESSAGE_IMAGE_WIDTH,
+    height: boundedHeight * MESSAGE_IMAGE_HEIGHT,
+  };
+};
 
 /**
  * 机器人聊天面板 —— 自包含 WebSocket 连接 + 聊天 UI
@@ -333,6 +364,7 @@ export function RobotChatPanel({
               role: 'ai',
               text: data.data?.text || '',
               imageUrl,
+              targetPosition: data.data?.targetPosition,
               timestamp: ts,
               actions: data.data?.actions,
             },
@@ -614,10 +646,20 @@ export function RobotChatPanel({
               {item.text}
             </Text>
             {item.imageUrl && (
-              <Image
-                source={{ uri: item.imageUrl }}
-                style={styles.messageImage}
-              />
+              <View style={styles.messageImageWrap}>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.messageImage}
+                />
+                {item.targetPosition && (
+                  <View
+                    style={[
+                      styles.targetBox,
+                      buildTargetBoxStyle(item.targetPosition),
+                    ]}
+                  />
+                )}
+              </View>
             )}
             {item.actions && item.actions.length > 0 && (
               <View style={styles.actionTags}>
@@ -830,11 +872,22 @@ const styles = StyleSheet.create({
   messageText: {
     lineHeight: 20,
   },
-  messageImage: {
-    width: 220,
-    height: 160,
+  messageImageWrap: {
     marginTop: 8,
+    width: MESSAGE_IMAGE_WIDTH,
+    height: MESSAGE_IMAGE_HEIGHT,
     borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  messageImage: {
+    width: MESSAGE_IMAGE_WIDTH,
+    height: MESSAGE_IMAGE_HEIGHT,
+  },
+  targetBox: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: '#ff3b30',
   },
   footer: {
     flexDirection: 'row',

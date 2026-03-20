@@ -324,6 +324,34 @@ export function D1ChoreoPlayScreen() {
     schedulerState === 'idle' ||
     schedulerState === 'stopped' ||
     schedulerState === 'completed';
+  const progressPercent =
+    totalDuration > 0 ? Math.min(100, (currentTime / totalDuration) * 100) : 0;
+  const progressWidth = `${progressPercent}%` as `${number}%`;
+  const progressFillStyle = useMemo(
+    () => [
+      styles.progressFill,
+      { backgroundColor: palette.primary, width: progressWidth },
+    ],
+    [palette.primary, progressWidth],
+  );
+  const buildBlockStyle = useCallback(
+    (
+      block: { color?: string; duration: number; startTime: number },
+      fallbackColor: string,
+    ) => {
+      const blockColor = block.color || fallbackColor;
+      return [
+        styles.block,
+        {
+          backgroundColor: `${blockColor}40`,
+          borderColor: blockColor,
+          width: Math.max(40, block.duration * 30),
+          marginLeft: block.startTime * 30 > 0 ? 2 : 0,
+        },
+      ];
+    },
+    [],
+  );
 
   if (loadError) {
     return (
@@ -472,18 +500,10 @@ export function D1ChoreoPlayScreen() {
                   {(track.blocks ?? []).map(block => (
                     <View
                       key={block.id}
-                      style={[
-                        styles.block,
-                        {
-                          backgroundColor:
-                            (block.color || track.color || palette.primary) +
-                            '40',
-                          borderColor:
-                            block.color || track.color || palette.primary,
-                          width: Math.max(40, block.duration * 30),
-                          marginLeft: block.startTime * 30 > 0 ? 2 : 0,
-                        },
-                      ]}
+                      style={buildBlockStyle(
+                        block,
+                        track.color || palette.primary,
+                      )}
                     >
                       <Text
                         style={[styles.blockText, { color: palette.text }]}
@@ -511,18 +531,7 @@ export function D1ChoreoPlayScreen() {
         <View
           style={[styles.progressTrack, { backgroundColor: palette.border }]}
         >
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: palette.primary,
-                width:
-                  totalDuration > 0
-                    ? `${Math.min(100, (currentTime / totalDuration) * 100)}%`
-                    : '0%',
-              },
-            ]}
-          />
+          <View style={progressFillStyle} />
         </View>
 
         <View style={styles.controlRow}>
