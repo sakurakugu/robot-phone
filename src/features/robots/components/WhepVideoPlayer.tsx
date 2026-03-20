@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-    MediaStream,
-    RTCPeerConnection,
-    RTCSessionDescription,
-    RTCView,
+  MediaStream,
+  RTCPeerConnection,
+  RTCSessionDescription,
+  RTCView,
 } from 'react-native-webrtc';
 
 type Props = {
