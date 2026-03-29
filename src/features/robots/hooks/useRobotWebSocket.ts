@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getAuthToken } from '../../auth/AuthContext';
 import { getActiveEnvironment } from '../../../shared/config/environment';
 import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../phoneIdentity';
 
@@ -83,7 +84,8 @@ export type UseRobotWebSocketResult = {
 /** 将 http/https baseUrl 转为对应的 ws/wss URL，并拼接路径 */
 function toWsUrl(baseUrl: string, path: string, robotId: string, identity: PhoneIdentity): string {
   const wsBase = baseUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
-  return `${wsBase}${path}?robotId=${robotId}&role=ui&phoneSessionId=${identity.phoneSessionId}&phoneDeviceId=${identity.phoneDeviceId}`;
+  const token = encodeURIComponent(getAuthToken());
+  return `${wsBase}${path}?robotId=${robotId}&role=ui&phoneSessionId=${identity.phoneSessionId}&phoneDeviceId=${identity.phoneDeviceId}&token=${token}`;
 }
 
 export function useRobotWebSocket(): UseRobotWebSocketResult {

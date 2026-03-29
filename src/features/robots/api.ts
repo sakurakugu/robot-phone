@@ -6,7 +6,12 @@ import {
     removeLocalRobot,
     upsertLocalRobot,
 } from './localRobotStorage';
-import type { DiscoveredRobot, Robot, RobotForm } from './types';
+import type {
+  ConversationHistoryResult,
+  DiscoveredRobot,
+  Robot,
+  RobotForm,
+} from './types';
 
 // ── 构造一个本地占位 Robot 对象（读取服务器时无法使用时的临时对象） ──
 function generateUUID(): string {
@@ -207,6 +212,16 @@ export function updateRobotAudioRoute(
   config: Partial<RobotAudioRouteConfig>,
 ): Promise<RobotAudioRouteConfig> {
   return http.put<RobotAudioRouteConfig>(`/robots/${uuid}/audio-route`, config);
+}
+
+export function getConversationHistory(
+  robotId: string,
+  limit = 50,
+  offset = 0,
+): Promise<ConversationHistoryResult> {
+  return http.get<ConversationHistoryResult>(
+    `/conversations/${robotId}?limit=${limit}&offset=${offset}`,
+  );
 }
 
 /**

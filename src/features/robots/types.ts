@@ -42,3 +42,22 @@ export type DiscoveredRobot = {
   ip: string;
   port: number;
 };
+
+export type ConversationRecord = {
+  uuid: number;
+  robot_id: string;
+  conversation_id?: string | null;
+  timestamp: string;
+  type: 'audio' | 'text';
+  user_input: string;
+  ai_response: string;
+  actions?: string | null;
+  processing_time?: number | null;
+  metadata?: string | null;
+};
+
+export type ConversationHistoryResult = {
+  conversations: ConversationRecord[];
+  limit: number;
+  offset: number;
+};

@@ -26,7 +26,9 @@ import {
 import RNBlobUtil from 'react-native-blob-util';
 import Video from 'react-native-video';
 import { usePalette } from '../../../app/theme/palette';
+import { getConversationHistory } from '../api';
 import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
+import type { ConversationRecord } from '../types';
 import { VoiceRecordButton } from './VoiceRecordButton';
 
 export type MessageTarget = 'ai' | 'robot';
@@ -100,9 +102,21 @@ function formatTime(ts: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+function 解析JSON<T>(value?: string | null): T | undefined {
+  if (!value) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
 const MESSAGE_IMAGE_WIDTH = 220;
 const MESSAGE_IMAGE_HEIGHT = 160;
+const HISTORY_PAGE_SIZE = 20;
 
 const buildTargetBoxStyle = (
   target: NonNullable<RobotChatMessage['targetPosition']>,
@@ -139,13 +153,21 @@ export function RobotChatPanel({
   const [messages, setMessages] = useState<RobotChatMessage[]>([]);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [playUri, setPlayUri] = useState<string | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<RobotChatMessage>>(null);
   const audioQueueRef = useRef<string[]>([]);
   const tempAudioFilesRef = useRef<string[]>([]);
   const isAudioPlayingRef = useRef(false);
   const playedConversationRef = useRef<Set<string>>(new Set());
   const streamConversationRef = useRef<Set<string>>(new Set());
   const audioStreamRef = useRef<Map<string, AudioStreamState>>(new Map());
+  const loadedRobotIdRef = useRef<string>('');
+  const shouldAutoScrollRef = useRef(false);
+  const loadingOlderHistoryRef = useRef(false);
+  const historyOffsetRef = useRef(0);
+  const hasMoreHistoryRef = useRef(true);
+  const allowLoadOlderRef = useRef(false);
+
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const {
     isConnected,
@@ -210,6 +232,11 @@ export function RobotChatPanel({
     [palette],
   );
 
+  const displayMessages = useMemo(
+    () => [...messages].reverse(),
+    [messages],
+  );
+
   /** 播放队列中的下一条音频 */
   const playNextAudio = useCallback(() => {
     if (isAudioPlayingRef.current) return;
@@ -254,6 +281,155 @@ export function RobotChatPanel({
     isAudioPlayingRef.current = false;
     playNextAudio();
   }, [playNextAudio, playUri]);
+
+  const loadHistory = useCallback(async (targetRobotId: string) => {
+    if (loadingOlderHistoryRef.current) {
+      return;
+    }
+    loadingOlderHistoryRef.current = true;
+    setLoadingHistory(true);
+    try {
+      const data = await getConversationHistory(targetRobotId, HISTORY_PAGE_SIZE, 0);
+      const historyMessages = data.conversations
+        .slice()
+        .reverse()
+        .flatMap((item: ConversationRecord) => {
+          const ts = new Date(item.timestamp).getTime();
+          const metadata = 解析JSON<Record<string, any>>(item.metadata);
+          const actions = 解析JSON<Array<{ name?: string }> | string[]>(
+            item.actions,
+          );
+          const normalizedActions = Array.isArray(actions)
+            ? actions
+                .map(action =>
+                  typeof action === 'string'
+                    ? action
+                    : typeof action?.name === 'string'
+                      ? action.name
+                      : '',
+                )
+                .filter(Boolean)
+            : [];
+          const visionImageBase64 = metadata?.visionImage?.base64;
+          const visionImageFormat = metadata?.visionImage?.format || 'jpeg';
+          const imageUrl = visionImageBase64
+            ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
+            : undefined;
+          const fromController = String(metadata?.from || '') === 'controller';
+
+          return [
+            {
+              id: `history-user-${item.uuid}`,
+              role: 'user' as const,
+              target: (fromController ? 'robot' : 'ai') as MessageTarget,
+              text: item.user_input,
+              timestamp: ts,
+            },
+            {
+              id: `history-ai-${item.uuid}`,
+              role: 'ai' as const,
+              text: item.ai_response,
+              imageUrl,
+              targetPosition: metadata?.targetPosition,
+              timestamp: ts,
+              actions: normalizedActions,
+            },
+          ];
+        });
+
+      setMessages(historyMessages);
+      loadedRobotIdRef.current = targetRobotId;
+      historyOffsetRef.current = data.conversations.length;
+      hasMoreHistoryRef.current = data.conversations.length >= HISTORY_PAGE_SIZE;
+      allowLoadOlderRef.current = false;
+    } catch {
+      if (loadedRobotIdRef.current !== targetRobotId) {
+        setMessages([]);
+      }
+      historyOffsetRef.current = 0;
+      hasMoreHistoryRef.current = false;
+      allowLoadOlderRef.current = false;
+    } finally {
+      loadingOlderHistoryRef.current = false;
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  const loadOlderHistory = useCallback(async () => {
+    if (
+      !robotUuid ||
+      loadingOlderHistoryRef.current ||
+      !hasMoreHistoryRef.current ||
+      messages.length === 0
+    ) {
+      return;
+    }
+
+    loadingOlderHistoryRef.current = true;
+    setLoadingHistory(true);
+    try {
+      const data = await getConversationHistory(
+        robotUuid,
+        HISTORY_PAGE_SIZE,
+        historyOffsetRef.current,
+      );
+      const historyMessages = data.conversations
+        .slice()
+        .reverse()
+        .flatMap((item: ConversationRecord) => {
+          const ts = new Date(item.timestamp).getTime();
+          const metadata = 解析JSON<Record<string, any>>(item.metadata);
+          const actions = 解析JSON<Array<{ name?: string }> | string[]>(
+            item.actions,
+          );
+          const normalizedActions = Array.isArray(actions)
+            ? actions
+                .map(action =>
+                  typeof action === 'string'
+                    ? action
+                    : typeof action?.name === 'string'
+                      ? action.name
+                      : '',
+                )
+                .filter(Boolean)
+            : [];
+          const visionImageBase64 = metadata?.visionImage?.base64;
+          const visionImageFormat = metadata?.visionImage?.format || 'jpeg';
+          const imageUrl = visionImageBase64
+            ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
+            : undefined;
+          const fromController = String(metadata?.from || '') === 'controller';
+
+          return [
+            {
+              id: `history-user-${item.uuid}`,
+              role: 'user' as const,
+              target: (fromController ? 'robot' : 'ai') as MessageTarget,
+              text: item.user_input,
+              timestamp: ts,
+            },
+            {
+              id: `history-ai-${item.uuid}`,
+              role: 'ai' as const,
+              text: item.ai_response,
+              imageUrl,
+              targetPosition: metadata?.targetPosition,
+              timestamp: ts,
+              actions: normalizedActions,
+            },
+          ];
+        });
+
+      if (historyMessages.length > 0) {
+        setMessages(prev => [...historyMessages, ...prev]);
+        historyOffsetRef.current += data.conversations.length;
+      }
+      hasMoreHistoryRef.current = data.conversations.length >= HISTORY_PAGE_SIZE;
+    } finally {
+      loadingOlderHistoryRef.current = false;
+      setLoadingHistory(false);
+    }
+  }, [messages.length, robotUuid]);
 
   const flushStreamAudio = useCallback(
     (sessionId: string, force = false) => {
@@ -301,13 +477,20 @@ export function RobotChatPanel({
   // 连接 / 断连
   useEffect(() => {
     if (robotUuid) {
+      if (loadedRobotIdRef.current !== robotUuid) {
+        setMessages([]);
+        historyOffsetRef.current = 0;
+        hasMoreHistoryRef.current = true;
+        allowLoadOlderRef.current = false;
+        loadHistory(robotUuid);
+      }
       connect(robotUuid);
     }
     return () => {
       disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [robotUuid]);
+  }, [robotUuid, loadHistory]);
 
   // 键盘事件监听
   useEffect(() => {
@@ -335,6 +518,7 @@ export function RobotChatPanel({
     const unsubscribe = onMessage(data => {
       if (data.type === 'asr_transcript') {
         const ts = Date.now();
+        shouldAutoScrollRef.current = true;
         setMessages(prev => [
           ...prev,
           {
@@ -355,6 +539,7 @@ export function RobotChatPanel({
         const imageUrl = visionImageBase64
           ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
           : undefined;
+        shouldAutoScrollRef.current = true;
         setMessages(prev => {
           const filtered = prev.filter(m => !m.loading);
           return [
@@ -381,6 +566,7 @@ export function RobotChatPanel({
           return;
         }
         const ts = Date.now();
+        shouldAutoScrollRef.current = true;
         setMessages(prev => {
           const filtered = prev.filter(m => !m.loading);
           return [
@@ -519,12 +705,15 @@ export function RobotChatPanel({
   // 消息变化时滚动到底部
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(
-        () => flatListRef.current?.scrollToEnd({ animated: true }),
-        100,
-      );
+      if (shouldAutoScrollRef.current) {
+        shouldAutoScrollRef.current = false;
+        setTimeout(
+          () => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }),
+          80,
+        );
+      }
     }
-  }, [messages.length]);
+  }, [messages.length, robotUuid]);
 
   const handleSend = useCallback(
     (target: MessageTarget) => {
@@ -544,6 +733,7 @@ export function RobotChatPanel({
           timestamp: ts,
           actions: [actionMatch.action],
         };
+        shouldAutoScrollRef.current = true;
         setMessages(prev => [...prev, userMsg]);
         sendAction(actionMatch.action, actionMatch.parameters);
       } else if (target === 'robot') {
@@ -555,6 +745,7 @@ export function RobotChatPanel({
           text,
           timestamp: ts,
         };
+        shouldAutoScrollRef.current = true;
         setMessages(prev => [...prev, userMsg]);
         sendToRobot(text);
       } else {
@@ -573,6 +764,7 @@ export function RobotChatPanel({
           timestamp: ts,
           loading: true,
         };
+        shouldAutoScrollRef.current = true;
         setMessages(prev => [...prev, userMsg, loadingMsg]);
         sendToAI(text);
       }
@@ -721,10 +913,38 @@ export function RobotChatPanel({
       ) : (
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayMessages}
+          inverted
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
           renderItem={renderItem}
+          onScrollBeginDrag={() => {
+            allowLoadOlderRef.current = true;
+          }}
+          onEndReached={() => {
+            if (allowLoadOlderRef.current) {
+              allowLoadOlderRef.current = false;
+              loadOlderHistory();
+            }
+          }}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={
+            loadingHistory ? (
+              <View style={styles.historyLoading}>
+                <ActivityIndicator size="small" color={palette.primary} />
+                <Text style={[styles.historyLoadingText, themedStyles.emptyText]}>
+                  正在加载更早的对话...
+                </Text>
+              </View>
+            ) : hasMoreHistoryRef.current ? (
+              <View style={styles.historyLoading}>
+                <Text style={[styles.historyLoadingText, themedStyles.emptyText]}>
+                  上拉加载更多历史
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -832,6 +1052,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     gap: 12,
+  },
+  historyLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 8,
+    gap: 6,
+  },
+  historyLoadingText: {
+    fontSize: 12,
   },
   bubbleRow: {
     flexDirection: 'row',

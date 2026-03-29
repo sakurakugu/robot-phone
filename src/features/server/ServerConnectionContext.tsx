@@ -27,6 +27,7 @@ import React, {
   useState,
 } from 'react';
 import { getActiveEnvironment } from '../../shared/config/environment';
+import { getAuthToken } from '../auth/AuthContext';
 
 const WS_PHONE_PATH = '/api/v1/phone/business';
 const CONNECT_TIMEOUT_MS = 8000;
@@ -65,9 +66,10 @@ const ServerConnectionContext = createContext<ServerConnectionContextValue>({
 /** 将 http/https baseUrl 转为对应的 ws/wss URL（手机独立通道，不含 robotId） */
 function buildPhoneWsUrl(baseUrl: string): string {
   const wsBase = baseUrl.replace(/^http(s?):\/\//, (_, s) => `ws${s}://`);
+  const token = encodeURIComponent(getAuthToken());
   // phoneId = 手机端会话 ID（整个 App 生命周期唯一、稳定）
   // 服务器识别 phoneId 后不会将其写入机器人数据库
-  return `${wsBase}${WS_PHONE_PATH}?phoneId=${PHONE_SESSION_ID}&role=ui`;
+  return `${wsBase}${WS_PHONE_PATH}?phoneId=${PHONE_SESSION_ID}&role=ui&token=${token}`;
 }
 
 export function ServerConnectionProvider({
