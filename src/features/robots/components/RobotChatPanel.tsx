@@ -1,141 +1,24 @@
-import {
-  // BrainCircuit,
-  Bot,
-  Send,
-} from 'lucide-react-native';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import RNBlobUtil from 'react-native-blob-util';
 import Video from 'react-native-video';
 import { usePalette } from '../../../app/theme/palette';
-import { getConversationHistory } from '../api';
-import { useRobotWebSocket } from '../hooks/useRobotWebSocket';
-import type { ConversationRecord } from '../types';
-import { VoiceRecordButton } from './VoiceRecordButton';
-
-export type MessageTarget = 'ai' | 'robot';
-
-export type RobotChatMessage = {
-  id: string;
-  /** 'user' = 用户发出；'ai' = 服务器/AI 回复 */
-  role: 'user' | 'ai';
-  target?: MessageTarget;
-  text: string;
-  imageUrl?: string;
-  targetPosition?: {
-    label: string;
-    cx: number;
-    cy: number;
-    w: number;
-    h: number;
-  };
-  timestamp: number;
-  actions?: string[];
-  /** 等待服务器回复中 */
-  loading?: boolean;
-};
-
-type AudioStreamState = {
-  sessionId: string;
-  format: string;
-  nextSeq: number;
-  pendingBySeq: Map<number, string>;
-  stagedChunks: string[];
-  started: boolean;
-  conversationId: string;
-};
+import { useRobotChatSession } from '../hooks/useRobotChatSession';
+import { RobotChatComposer } from './RobotChatComposer';
+import { RobotChatMessageBubble } from './RobotChatMessageBubble';
 
 type RobotChatPanelProps = {
   robotUuid: string;
   robotName?: string;
   showStatusHeader?: boolean;
-};
-
-/** 解析动作格式 {{action=xxx}} 或 {{action=xxx,param=value}} */
-function parseActionFormat(
-  text: string,
-): { action: string; parameters: Record<string, any> } | null {
-  const actionRegex =
-    /^\{\{action=([a-zA-Z_][a-zA-Z0-9_]*)((?:,[a-zA-Z_][a-zA-Z0-9_]*=[^,}]+)*)\}\}$/;
-  const match = text.match(actionRegex);
-  if (!match) return null;
-
-  const action = match[1];
-  const paramsStr = match[2];
-  const parameters: Record<string, any> = {};
-
-  if (paramsStr) {
-    const paramPairs = paramsStr.slice(1).split(',');
-    for (const pair of paramPairs) {
-      const [key, value] = pair.split('=');
-      if (key && value !== undefined) {
-        parameters[key.trim()] = isNaN(Number(value)) ? value : Number(value);
-      }
-    }
-  }
-  return { action, parameters };
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '00');
-  return `${hh}:${mm}:${ss}`;
-}
-
-function 解析JSON<T>(value?: string | null): T | undefined {
-  if (!value) {
-    return undefined;
-  }
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return undefined;
-  }
-}
-
-const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
-const MESSAGE_IMAGE_WIDTH = 220;
-const MESSAGE_IMAGE_HEIGHT = 160;
-const HISTORY_PAGE_SIZE = 20;
-
-const buildTargetBoxStyle = (
-  target: NonNullable<RobotChatMessage['targetPosition']>,
-) => {
-  const cx = clampUnit(target.cx);
-  const cy = clampUnit(target.cy);
-  const width = clampUnit(target.w);
-  const height = clampUnit(target.h);
-  const left = clampUnit(cx - width / 2);
-  const top = clampUnit(cy - height / 2);
-  const boundedWidth = clampUnit(Math.min(width, 1 - left));
-  const boundedHeight = clampUnit(Math.min(height, 1 - top));
-
-  return {
-    left: left * MESSAGE_IMAGE_WIDTH,
-    top: top * MESSAGE_IMAGE_HEIGHT,
-    width: boundedWidth * MESSAGE_IMAGE_WIDTH,
-    height: boundedHeight * MESSAGE_IMAGE_HEIGHT,
-  };
 };
 
 /**
@@ -148,356 +31,30 @@ export function RobotChatPanel({
   showStatusHeader = false,
 }: RobotChatPanelProps) {
   const palette = usePalette();
-
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<RobotChatMessage[]>([]);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [playUri, setPlayUri] = useState<string | null>(null);
-  const flatListRef = useRef<FlatList<RobotChatMessage>>(null);
-  const audioQueueRef = useRef<string[]>([]);
-  const tempAudioFilesRef = useRef<string[]>([]);
-  const isAudioPlayingRef = useRef(false);
-  const playedConversationRef = useRef<Set<string>>(new Set());
-  const streamConversationRef = useRef<Set<string>>(new Set());
-  const audioStreamRef = useRef<Map<string, AudioStreamState>>(new Map());
-  const loadedRobotIdRef = useRef<string>('');
-  const shouldAutoScrollRef = useRef(false);
-  const loadingOlderHistoryRef = useRef(false);
-  const historyOffsetRef = useRef(0);
-  const hasMoreHistoryRef = useRef(true);
-  const allowLoadOlderRef = useRef(false);
-
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
   const {
+    flatListRef,
+    input,
+    setInput,
+    messages,
+    displayMessages,
+    loadingHistory,
+    hasMoreHistory,
     isConnected,
-    connect,
-    disconnect,
-    sendToAI,
-    sendToRobot,
-    sendAction,
-    onMessage,
-    isAudioUploadConnected,
-    sendAudioStart,
-    sendAudioChunk,
-    sendAudioEnd,
-  } = useRobotWebSocket();
+    statusText,
+    audioMethods,
+    playUri,
+    finalizeCurrentAudio,
+    handleSend,
+    handleHistoryScrollBegin,
+    handleHistoryEndReached,
+  } = useRobotChatSession({ robotUuid, robotName });
 
-  const audioMethods = useMemo(
-    () => ({
-      sendAudioStart,
-      sendAudioChunk,
-      sendAudioEnd,
-      isAudioUploadConnected,
-    }),
-    [sendAudioStart, sendAudioChunk, sendAudioEnd, isAudioUploadConnected],
-  );
-
-  const statusText = useMemo(() => {
-    const status = isConnected ? '已连接' : '未连接';
-    return `${robotName || '未命名机器人'} · ${status}`;
-  }, [robotName, isConnected]);
-  const themedStyles = useMemo(
-    () => ({
-      bubbleLeft: {
-        backgroundColor: palette.surface,
-        borderColor: palette.border,
-        borderWidth: 1,
-      },
-      bubbleRight: { backgroundColor: palette.primary },
-      metaLabelLeft: { color: palette.textMuted },
-      metaLabelRight: { color: 'rgba(255,255,255,0.7)' },
-      metaTimeLeft: { color: palette.textMuted },
-      metaTimeRight: { color: 'rgba(255,255,255,0.6)' },
-      messageLeft: { color: palette.text },
-      messageRight: { color: '#FFFFFF' },
-      actionLabelLeft: { color: palette.textMuted },
-      actionLabelRight: { color: 'rgba(255,255,255,0.7)' },
-      statusHeader: { borderBottomColor: palette.border },
-      dotConnected: { backgroundColor: palette.success },
-      dotDisconnected: { backgroundColor: palette.textMuted },
-      statusText: { color: palette.textMuted },
-      emptyText: { color: palette.textMuted },
-      footer: {
-        borderTopColor: palette.border,
-        backgroundColor: palette.surface,
-      },
-      input: {
-        borderColor: palette.border,
-        color: palette.text,
-      },
-      sendBtnRobot: { backgroundColor: palette.success },
-      sendBtnAi: { backgroundColor: palette.primary },
-    }),
-    [palette],
-  );
-
-  const displayMessages = useMemo(
-    () => [...messages].reverse(),
-    [messages],
-  );
-
-  /** 播放队列中的下一条音频 */
-  const playNextAudio = useCallback(() => {
-    if (isAudioPlayingRef.current) return;
-    const next = audioQueueRef.current.shift();
-    if (!next) return;
-    isAudioPlayingRef.current = true;
-    setPlayUri(next);
-  }, []);
-
-  /** 将 base64 音频写入缓存并排队播放 */
-  const enqueueBase64Audio = useCallback(
-    async (base64: string, format?: string) => {
-      const normalized = (format || 'mp3').toLowerCase();
-      const ext =
-        normalized === 'wav' || normalized === 'aac' || normalized === 'm4a'
-          ? normalized
-          : 'mp3';
-      const filePath = `${RNBlobUtil.fs.dirs.CacheDir}/robot-tts-${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-      try {
-        await RNBlobUtil.fs.writeFile(filePath, base64, 'base64');
-        tempAudioFilesRef.current.push(filePath);
-        audioQueueRef.current.push(`file://${filePath}`);
-        playNextAudio();
-      } catch {
-        // 写入失败直接跳过，避免阻塞聊天流程
-      }
-    },
-    [playNextAudio],
-  );
-
-  const finalizeCurrentAudio = useCallback(() => {
-    if (playUri) {
-      const path = playUri.replace(/^file:\/\//, '');
-      RNBlobUtil.fs.unlink(path).catch(() => {
-        // 缓存文件可能已被系统清理
-      });
-      tempAudioFilesRef.current = tempAudioFilesRef.current.filter(
-        p => p !== path,
-      );
-    }
-    setPlayUri(null);
-    isAudioPlayingRef.current = false;
-    playNextAudio();
-  }, [playNextAudio, playUri]);
-
-  const loadHistory = useCallback(async (targetRobotId: string) => {
-    if (loadingOlderHistoryRef.current) {
-      return;
-    }
-    loadingOlderHistoryRef.current = true;
-    setLoadingHistory(true);
-    try {
-      const data = await getConversationHistory(targetRobotId, HISTORY_PAGE_SIZE, 0);
-      const historyMessages = data.conversations
-        .slice()
-        .reverse()
-        .flatMap((item: ConversationRecord) => {
-          const ts = new Date(item.timestamp).getTime();
-          const metadata = 解析JSON<Record<string, any>>(item.metadata);
-          const actions = 解析JSON<Array<{ name?: string }> | string[]>(
-            item.actions,
-          );
-          const normalizedActions = Array.isArray(actions)
-            ? actions
-                .map(action =>
-                  typeof action === 'string'
-                    ? action
-                    : typeof action?.name === 'string'
-                      ? action.name
-                      : '',
-                )
-                .filter(Boolean)
-            : [];
-          const visionImageBase64 = metadata?.visionImage?.base64;
-          const visionImageFormat = metadata?.visionImage?.format || 'jpeg';
-          const imageUrl = visionImageBase64
-            ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
-            : undefined;
-          const fromController = String(metadata?.from || '') === 'controller';
-
-          return [
-            {
-              id: `history-user-${item.uuid}`,
-              role: 'user' as const,
-              target: (fromController ? 'robot' : 'ai') as MessageTarget,
-              text: item.user_input,
-              timestamp: ts,
-            },
-            {
-              id: `history-ai-${item.uuid}`,
-              role: 'ai' as const,
-              text: item.ai_response,
-              imageUrl,
-              targetPosition: metadata?.targetPosition,
-              timestamp: ts,
-              actions: normalizedActions,
-            },
-          ];
-        });
-
-      setMessages(historyMessages);
-      loadedRobotIdRef.current = targetRobotId;
-      historyOffsetRef.current = data.conversations.length;
-      hasMoreHistoryRef.current = data.conversations.length >= HISTORY_PAGE_SIZE;
-      allowLoadOlderRef.current = false;
-    } catch {
-      if (loadedRobotIdRef.current !== targetRobotId) {
-        setMessages([]);
-      }
-      historyOffsetRef.current = 0;
-      hasMoreHistoryRef.current = false;
-      allowLoadOlderRef.current = false;
-    } finally {
-      loadingOlderHistoryRef.current = false;
-      setLoadingHistory(false);
-    }
-  }, []);
-
-  const loadOlderHistory = useCallback(async () => {
-    if (
-      !robotUuid ||
-      loadingOlderHistoryRef.current ||
-      !hasMoreHistoryRef.current ||
-      messages.length === 0
-    ) {
-      return;
-    }
-
-    loadingOlderHistoryRef.current = true;
-    setLoadingHistory(true);
-    try {
-      const data = await getConversationHistory(
-        robotUuid,
-        HISTORY_PAGE_SIZE,
-        historyOffsetRef.current,
-      );
-      const historyMessages = data.conversations
-        .slice()
-        .reverse()
-        .flatMap((item: ConversationRecord) => {
-          const ts = new Date(item.timestamp).getTime();
-          const metadata = 解析JSON<Record<string, any>>(item.metadata);
-          const actions = 解析JSON<Array<{ name?: string }> | string[]>(
-            item.actions,
-          );
-          const normalizedActions = Array.isArray(actions)
-            ? actions
-                .map(action =>
-                  typeof action === 'string'
-                    ? action
-                    : typeof action?.name === 'string'
-                      ? action.name
-                      : '',
-                )
-                .filter(Boolean)
-            : [];
-          const visionImageBase64 = metadata?.visionImage?.base64;
-          const visionImageFormat = metadata?.visionImage?.format || 'jpeg';
-          const imageUrl = visionImageBase64
-            ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
-            : undefined;
-          const fromController = String(metadata?.from || '') === 'controller';
-
-          return [
-            {
-              id: `history-user-${item.uuid}`,
-              role: 'user' as const,
-              target: (fromController ? 'robot' : 'ai') as MessageTarget,
-              text: item.user_input,
-              timestamp: ts,
-            },
-            {
-              id: `history-ai-${item.uuid}`,
-              role: 'ai' as const,
-              text: item.ai_response,
-              imageUrl,
-              targetPosition: metadata?.targetPosition,
-              timestamp: ts,
-              actions: normalizedActions,
-            },
-          ];
-        });
-
-      if (historyMessages.length > 0) {
-        setMessages(prev => [...historyMessages, ...prev]);
-        historyOffsetRef.current += data.conversations.length;
-      }
-      hasMoreHistoryRef.current = data.conversations.length >= HISTORY_PAGE_SIZE;
-    } finally {
-      loadingOlderHistoryRef.current = false;
-      setLoadingHistory(false);
-    }
-  }, [messages.length, robotUuid]);
-
-  const flushStreamAudio = useCallback(
-    (sessionId: string, force = false) => {
-      const streamState = audioStreamRef.current.get(sessionId);
-      if (!streamState) {
-        return;
-      }
-      const minChunks = 1;
-      if (!force && streamState.stagedChunks.length < minChunks) {
-        return;
-      }
-      const toPlay = force
-        ? streamState.stagedChunks.splice(0, streamState.stagedChunks.length)
-        : streamState.stagedChunks.splice(0, minChunks);
-      if (toPlay.length === 0) {
-        return;
-      }
-      streamState.started = true;
-      for (const base64 of toPlay) {
-        enqueueBase64Audio(base64, streamState.format);
-      }
-    },
-    [enqueueBase64Audio],
-  );
-
-  const consumeStreamChunks = useCallback(
-    (sessionId: string) => {
-      const streamState = audioStreamRef.current.get(sessionId);
-      if (!streamState) {
-        return;
-      }
-      while (streamState.pendingBySeq.has(streamState.nextSeq)) {
-        const chunk = streamState.pendingBySeq.get(streamState.nextSeq);
-        streamState.pendingBySeq.delete(streamState.nextSeq);
-        streamState.nextSeq += 1;
-        if (chunk) {
-          streamState.stagedChunks.push(chunk);
-        }
-      }
-      flushStreamAudio(sessionId);
-    },
-    [flushStreamAudio],
-  );
-
-  // 连接 / 断连
-  useEffect(() => {
-    if (robotUuid) {
-      if (loadedRobotIdRef.current !== robotUuid) {
-        setMessages([]);
-        historyOffsetRef.current = 0;
-        hasMoreHistoryRef.current = true;
-        allowLoadOlderRef.current = false;
-        loadHistory(robotUuid);
-      }
-      connect(robotUuid);
-    }
-    return () => {
-      disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [robotUuid, loadHistory]);
-
-  // 键盘事件监听
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      e => {
-        setKeyboardOffset(e.endCoordinates.height);
+      event => {
+        setKeyboardOffset(event.endCoordinates.height);
       },
     );
     const keyboardDidHideListener = Keyboard.addListener(
@@ -513,400 +70,45 @@ export function RobotChatPanel({
     };
   }, []);
 
-  // 注册消息处理
-  useEffect(() => {
-    const unsubscribe = onMessage(data => {
-      if (data.type === 'asr_transcript') {
-        const ts = Date.now();
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `asr-${ts}`,
-            role: 'user',
-            target: 'ai',
-            text: data.data?.text || '',
-            timestamp: ts,
-          },
-        ]);
-        return;
-      }
-
-      if (data.type === 'text_response') {
-        const ts = Date.now();
-        const visionImageBase64 = data.data?.visionImage?.base64;
-        const visionImageFormat = data.data?.visionImage?.format || 'jpeg';
-        const imageUrl = visionImageBase64
-          ? `data:image/${visionImageFormat};base64,${visionImageBase64}`
-          : undefined;
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => {
-          const filtered = prev.filter(m => !m.loading);
-          return [
-            ...filtered,
-            {
-              id: `ai-${ts}`,
-              role: 'ai',
-              text: data.data?.text || '',
-              imageUrl,
-              targetPosition: data.data?.targetPosition,
-              timestamp: ts,
-              actions: data.data?.actions,
-            },
-          ];
-        });
-        return;
-      }
-
-      if (data.type === 'error') {
-        if (
-          data.data?.code === 'ASR_ERROR' ||
-          String(data.data?.message || '').includes('Opus解码失败')
-        ) {
-          return;
-        }
-        const ts = Date.now();
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => {
-          const filtered = prev.filter(m => !m.loading);
-          return [
-            ...filtered,
-            {
-              id: `err-${ts}`,
-              role: 'ai',
-              text: `发生错误：${data.data?.message || '未知错误'}`,
-              timestamp: ts,
-            },
-          ];
-        });
-        return;
-      }
-
-      if (data.type === 'audio_response') {
-        const conversationId =
-          typeof data.conversationId === 'string' ? data.conversationId : '';
-        if (
-          conversationId &&
-          (playedConversationRef.current.has(conversationId) ||
-            streamConversationRef.current.has(conversationId))
-        ) {
-          return;
-        }
-
-        const base64 =
-          (typeof data.data?.buffer === 'string' && data.data.buffer) ||
-          (typeof data.data?.base64 === 'string' && data.data.base64) ||
-          '';
-
-        if (!base64) {
-          return;
-        }
-
-        if (conversationId) {
-          playedConversationRef.current.add(conversationId);
-          if (playedConversationRef.current.size > 200) {
-            const entries = Array.from(playedConversationRef.current);
-            playedConversationRef.current = new Set(entries.slice(-100));
-          }
-        }
-
-        enqueueBase64Audio(base64, data.data?.format);
-        return;
-      }
-
-      if (data.type === 'audio_stream_start') {
-        const sessionId =
-          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
-        if (!sessionId) {
-          return;
-        }
-        const conversationId =
-          typeof data.conversationId === 'string' ? data.conversationId : '';
-        if (conversationId) {
-          streamConversationRef.current.add(conversationId);
-          if (streamConversationRef.current.size > 200) {
-            const entries = Array.from(streamConversationRef.current);
-            streamConversationRef.current = new Set(entries.slice(-100));
-          }
-        }
-        audioStreamRef.current.set(sessionId, {
-          sessionId,
-          format:
-            typeof data.data?.format === 'string' && data.data.format
-              ? data.data.format
-              : 'mp3',
-          nextSeq: 1,
-          pendingBySeq: new Map<number, string>(),
-          stagedChunks: [],
-          started: false,
-          conversationId,
-        });
-        return;
-      }
-
-      if (data.type === 'audio_stream_chunk') {
-        const sessionId =
-          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
-        const buffer =
-          typeof data.data?.buffer === 'string' ? data.data.buffer : '';
-        if (!sessionId || !buffer) {
-          return;
-        }
-        const seqNumber = Number(data.data?.seq);
-        const seq = Number.isFinite(seqNumber) && seqNumber > 0 ? seqNumber : 0;
-        const streamState = audioStreamRef.current.get(sessionId);
-        if (!streamState || seq === 0) {
-          return;
-        }
-        streamState.pendingBySeq.set(seq, buffer);
-        consumeStreamChunks(sessionId);
-        return;
-      }
-
-      if (data.type === 'audio_stream_end') {
-        const sessionId =
-          typeof data.data?.sessionId === 'string' ? data.data.sessionId : '';
-        if (!sessionId) {
-          return;
-        }
-        consumeStreamChunks(sessionId);
-        flushStreamAudio(sessionId, true);
-        const streamState = audioStreamRef.current.get(sessionId);
-        if (streamState?.conversationId) {
-          playedConversationRef.current.add(streamState.conversationId);
-          if (playedConversationRef.current.size > 200) {
-            const entries = Array.from(playedConversationRef.current);
-            playedConversationRef.current = new Set(entries.slice(-100));
-          }
-        }
-        audioStreamRef.current.delete(sessionId);
-      }
-    });
-    return unsubscribe;
-  }, [consumeStreamChunks, enqueueBase64Audio, flushStreamAudio, onMessage]);
-
-  useEffect(() => {
-    const audioStreamStates = audioStreamRef.current;
-    return () => {
-      for (const path of tempAudioFilesRef.current) {
-        RNBlobUtil.fs.unlink(path).catch(() => {
-          // 卸载时忽略清理失败
-        });
-      }
-      tempAudioFilesRef.current = [];
-      audioQueueRef.current = [];
-      isAudioPlayingRef.current = false;
-      playedConversationRef.current.clear();
-      streamConversationRef.current.clear();
-      audioStreamStates.clear();
-    };
-  }, []);
-
-  // 消息变化时滚动到底部
-  useEffect(() => {
-    if (messages.length > 0) {
-      if (shouldAutoScrollRef.current) {
-        shouldAutoScrollRef.current = false;
-        setTimeout(
-          () => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }),
-          80,
-        );
-      }
-    }
-  }, [messages.length, robotUuid]);
-
-  const handleSend = useCallback(
-    (target: MessageTarget) => {
-      const text = input.trim();
-      if (!text || !isConnected) return;
-
-      const ts = Date.now();
-      const actionMatch = parseActionFormat(text);
-
-      if (actionMatch) {
-        // 动作格式 —— 直接发送 action_input
-        const userMsg: RobotChatMessage = {
-          id: `user-${ts}`,
-          role: 'user',
-          target: 'robot',
-          text,
-          timestamp: ts,
-          actions: [actionMatch.action],
-        };
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => [...prev, userMsg]);
-        sendAction(actionMatch.action, actionMatch.parameters);
-      } else if (target === 'robot') {
-        // 直接合成 TTS 推送到机器狗
-        const userMsg: RobotChatMessage = {
-          id: `user-${ts}`,
-          role: 'user',
-          target: 'robot',
-          text,
-          timestamp: ts,
-        };
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => [...prev, userMsg]);
-        sendToRobot(text);
-      } else {
-        // 发给大模型
-        const userMsg: RobotChatMessage = {
-          id: `user-${ts}`,
-          role: 'user',
-          target: 'ai',
-          text,
-          timestamp: ts,
-        };
-        const loadingMsg: RobotChatMessage = {
-          id: `loading-${ts}`,
-          role: 'ai',
-          text: '',
-          timestamp: ts,
-          loading: true,
-        };
-        shouldAutoScrollRef.current = true;
-        setMessages(prev => [...prev, userMsg, loadingMsg]);
-        sendToAI(text);
-      }
-
-      setInput('');
-    },
-    [input, isConnected, sendAction, sendToAI, sendToRobot],
-  );
-
-  const renderItem = useCallback(
-    ({ item }: { item: RobotChatMessage }) => {
-      const isUser = item.role === 'user';
-      // 发给机器人的消息显示在左侧
-      const isRight = isUser && item.target !== 'robot';
-
-      if (item.loading) {
-        return (
-          <View style={[styles.bubbleRow, styles.bubbleRowLeft]}>
-            <View style={[styles.bubble, themedStyles.bubbleLeft]}>
-              <ActivityIndicator size="small" color={palette.primary} />
-            </View>
-          </View>
-        );
-      }
-
-      return (
-        <View
-          style={[
-            styles.bubbleRow,
-            isRight ? styles.bubbleRowRight : styles.bubbleRowLeft,
-          ]}
-        >
-          <View
-            style={[
-              styles.bubble,
-              isRight ? themedStyles.bubbleRight : themedStyles.bubbleLeft,
-            ]}
-          >
-            <View style={styles.bubbleMeta}>
-              <Text
-                style={[
-                  styles.metaLabel,
-                  isRight
-                    ? themedStyles.metaLabelRight
-                    : themedStyles.metaLabelLeft,
-                ]}
-              >
-                {isUser
-                  ? item.target === 'ai'
-                    ? '用户 → AI'
-                    : '用户 → 机器狗'
-                  : 'AI助手'}
-              </Text>
-              <Text
-                style={[
-                  styles.metaTime,
-                  isRight
-                    ? themedStyles.metaTimeRight
-                    : themedStyles.metaTimeLeft,
-                ]}
-              >
-                {formatTime(item.timestamp)}
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.messageText,
-                isRight ? themedStyles.messageRight : themedStyles.messageLeft,
-              ]}
-            >
-              {item.text}
-            </Text>
-            {item.imageUrl && (
-              <View style={styles.messageImageWrap}>
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.messageImage}
-                />
-                {item.targetPosition && (
-                  <View
-                    style={[
-                      styles.targetBox,
-                      buildTargetBoxStyle(item.targetPosition),
-                    ]}
-                  />
-                )}
-              </View>
-            )}
-            {item.actions && item.actions.length > 0 && (
-              <View style={styles.actionTags}>
-                <Text
-                  style={[
-                    styles.actionLabel,
-                    isRight
-                      ? themedStyles.actionLabelRight
-                      : themedStyles.actionLabelLeft,
-                  ]}
-                >
-                  ⚡ {item.actions.join(', ')}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      );
-    },
-    [palette, themedStyles],
-  );
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={keyboardOffset > 0 ? 90 : 0} // 键盘弹出时偏移 90，否则为 0
+      keyboardVerticalOffset={keyboardOffset > 0 ? 90 : 0}
     >
-      {/* 顶部状态栏 */}
-      {showStatusHeader && (
-        <View style={[styles.statusHeader, themedStyles.statusHeader]}>
+      {showStatusHeader ? (
+        <View
+          style={[
+            styles.statusHeader,
+            { borderBottomColor: palette.border },
+          ]}
+        >
           <View
             style={[
               styles.dot,
-              isConnected
-                ? themedStyles.dotConnected
-                : themedStyles.dotDisconnected,
+              {
+                backgroundColor: isConnected
+                  ? palette.success
+                  : palette.textMuted,
+              },
             ]}
           />
-          <Text style={[styles.statusText, themedStyles.statusText]}>
+          <Text style={[styles.statusText, { color: palette.textMuted }]}>
             {statusText}
           </Text>
-          {!isConnected && (
+          {!isConnected ? (
             <ActivityIndicator
               size="small"
               color={palette.primary}
               style={styles.statusSpinner}
             />
-          )}
+          ) : null}
         </View>
-      )}
+      ) : null}
 
       {messages.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={[styles.emptyText, themedStyles.emptyText]}>
+          <Text style={[styles.emptyText, { color: palette.textMuted }]}>
             还没有对话记录，发送一条消息开始吧！
           </Text>
         </View>
@@ -918,28 +120,31 @@ export function RobotChatPanel({
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-          renderItem={renderItem}
-          onScrollBeginDrag={() => {
-            allowLoadOlderRef.current = true;
-          }}
-          onEndReached={() => {
-            if (allowLoadOlderRef.current) {
-              allowLoadOlderRef.current = false;
-              loadOlderHistory();
-            }
-          }}
+          renderItem={({ item }) => <RobotChatMessageBubble item={item} />}
+          onScrollBeginDrag={handleHistoryScrollBegin}
+          onEndReached={handleHistoryEndReached}
           onEndReachedThreshold={0.2}
           ListFooterComponent={
             loadingHistory ? (
               <View style={styles.historyLoading}>
                 <ActivityIndicator size="small" color={palette.primary} />
-                <Text style={[styles.historyLoadingText, themedStyles.emptyText]}>
+                <Text
+                  style={[
+                    styles.historyLoadingText,
+                    { color: palette.textMuted },
+                  ]}
+                >
                   正在加载更早的对话...
                 </Text>
               </View>
-            ) : hasMoreHistoryRef.current ? (
+            ) : hasMoreHistory ? (
               <View style={styles.historyLoading}>
-                <Text style={[styles.historyLoadingText, themedStyles.emptyText]}>
+                <Text
+                  style={[
+                    styles.historyLoadingText,
+                    { color: palette.textMuted },
+                  ]}
+                >
                   上拉加载更多历史
                 </Text>
               </View>
@@ -948,55 +153,13 @@ export function RobotChatPanel({
         />
       )}
 
-      <View style={[styles.footer, themedStyles.footer]}>
-        <TextInput
-          style={[styles.input, themedStyles.input]}
-          placeholder="输入消息... (支持 {{action=xxx}} 格式)"
-          placeholderTextColor={palette.textMuted}
-          value={input}
-          onChangeText={setInput}
-          multiline
-          numberOfLines={2}
-        />
-        <View style={styles.btnGroup}>
-          <VoiceRecordButton audio={audioMethods} size={32} iconSize={14} />
-          <Pressable
-            style={[
-              styles.sendBtn,
-              themedStyles.sendBtnRobot,
-              !isConnected || !input.trim()
-                ? styles.sendBtnDisabled
-                : styles.sendBtnEnabled,
-            ]}
-            disabled={!isConnected || !input.trim()}
-            onPress={() => handleSend('robot')}
-          >
-            <View style={styles.sendIconRow}>
-              {/* <Text style={styles.sendBtnText}>发给</Text> */}
-              <Bot size={14} color="#FFFFFF" />
-            </View>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.sendBtn,
-              themedStyles.sendBtnAi,
-              !isConnected || !input.trim()
-                ? styles.sendBtnDisabled
-                : styles.sendBtnEnabled,
-            ]}
-            disabled={!isConnected || !input.trim()}
-            onPress={() => handleSend('ai')}
-          >
-            <View style={styles.sendIconRow}>
-              {/* <Text style={styles.sendBtnText}>发给</Text> */}
-              <Send size={14} color="#FFFFFF" />
-              {/* <View style={{ transform: [{ rotate: '90deg' }] }}>
-                <BrainCircuit size={14} color="#FFFFFF" />
-              </View> */}
-            </View>
-          </Pressable>
-        </View>
-      </View>
+      <RobotChatComposer
+        input={input}
+        isConnected={isConnected}
+        audioMethods={audioMethods}
+        onChangeInput={setInput}
+        onSend={handleSend}
+      />
 
       {playUri ? (
         <Video
@@ -1060,105 +223,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   historyLoadingText: {
-    fontSize: 12,
-  },
-  bubbleRow: {
-    flexDirection: 'row',
-  },
-  bubbleRowRight: {
-    justifyContent: 'flex-end',
-  },
-  bubbleRowLeft: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '80%',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 4,
-  },
-  bubbleMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 8,
-  },
-  metaLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  metaTime: {
-    fontSize: 10,
-  },
-  actionTags: {
-    marginTop: 6,
-  },
-  actionLabel: {
-    fontSize: 11,
-  },
-  messageText: {
-    lineHeight: 20,
-  },
-  messageImageWrap: {
-    marginTop: 8,
-    width: MESSAGE_IMAGE_WIDTH,
-    height: MESSAGE_IMAGE_HEIGHT,
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  messageImage: {
-    width: MESSAGE_IMAGE_WIDTH,
-    height: MESSAGE_IMAGE_HEIGHT,
-  },
-  targetBox: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: '#ff3b30',
-  },
-  footer: {
-    flexDirection: 'row',
-    // alignItems: 'flex-end',
-    alignItems: 'center',
-    gap: 8,
-    borderTopWidth: 1,
-    padding: 10,
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    maxHeight: 80,
-  },
-  btnGroup: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  sendBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendBtnEnabled: {
-    opacity: 1,
-  },
-  sendIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sendBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 12,
   },
   hiddenAudio: {
