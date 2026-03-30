@@ -1,5 +1,4 @@
 import argparse
-import importlib.util
 import os
 import re
 import shutil
@@ -11,6 +10,7 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import List, Tuple, Optional
+from scripts.robot.package_builder import 执行打包流程
 from scripts.start.utils import (
     LOGS_DIR,
     ROOT,
@@ -419,13 +419,7 @@ def _修复hermes_win64() -> None:
 
 
 def _执行机器人套件打包() -> tuple[str, str, list[Path]]:
-    tool_path = ROOT / "tools" / "2.配置机器狗.py"
-    spec = importlib.util.spec_from_file_location("robot_dog_packager", tool_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"无法加载打包脚本: {tool_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.执行打包流程(open_explorer=False, require_prompt=False)
+    return 执行打包流程(open_explorer=False, require_prompt=False)
 
 
 def _清空目录(target_dir: Path) -> None:
