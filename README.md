@@ -19,7 +19,7 @@ bundle exec pod install
 ### Android
 
 ```bash
-cd ./app/phone-app/RobotPhone/
+cd ./
 # npm start
 npm run android
 ```
@@ -27,7 +27,7 @@ npm run android
 ### iOS
 
 ```bash
-cd ./app/phone-app/RobotPhone/
+cd ./
 npm start
 npm run ios
 ```

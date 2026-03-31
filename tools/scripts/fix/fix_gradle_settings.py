@@ -97,7 +97,6 @@ def 修复react_native_gradle_plugin(workspace_root: Path, dry_run: bool = False
     # 常见的 React Native Gradle Plugin 路径
     plugin_paths = [
         'node_modules/@react-native/gradle-plugin',
-        'app/phone-app/RobotPhone/node_modules/@react-native/gradle-plugin',
     ]
 
     for plugin_path in plugin_paths:

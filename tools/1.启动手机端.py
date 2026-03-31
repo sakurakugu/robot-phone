@@ -44,7 +44,7 @@ from scripts.start.utils import (
     持续监控直到中断,
 )
 
-ROBOT_PHONE = ROOT / "app" / "phone-app" / "RobotPhone"
+ROBOT_PHONE = ROOT
 
 
 def parse_args() -> argparse.Namespace:
