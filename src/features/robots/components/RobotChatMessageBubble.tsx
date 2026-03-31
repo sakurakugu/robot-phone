@@ -13,7 +13,7 @@ import {
   MESSAGE_IMAGE_HEIGHT,
   MESSAGE_IMAGE_WIDTH,
   type RobotChatMessage,
-} from '../services/RobotChat';
+} from '../services/robotChat';
 
 type RobotChatMessageBubbleProps = {
   item: RobotChatMessage;

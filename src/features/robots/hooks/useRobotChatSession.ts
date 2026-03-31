@@ -8,7 +8,7 @@ import {
   parseActionFormat,
   type MessageTarget,
   type RobotChatMessage,
-} from '../services/RobotChat';
+} from '../services/robotChat';
 import { useRobotChatAudio } from './useRobotChatAudio';
 import { useRobotWebSocket } from './useRobotWebSocket';
 

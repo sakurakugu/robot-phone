@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import re
 import shutil
@@ -10,6 +11,24 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import List, Tuple, Optional
+
+
+def _配置标准流编码() -> None:
+    """Windows 下统一使用 UTF-8 输出，避免表情符号触发编码异常"""
+    if os.name != "nt":
+        return
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+_配置标准流编码()
+
 from scripts.robot.package_builder import 执行打包流程
 from scripts.start.utils import (
     LOGS_DIR,
@@ -317,12 +336,84 @@ def _打开目录(target_dir: Path) -> None:
         subprocess.run(["xdg-open", str(target_dir)])
 
 
+def _规范化绝对路径(target: Path) -> str:
+    """返回用于比较的规范化绝对路径字符串"""
+    return os.path.normcase(str(target.resolve(strict=False)))
+
+
+def _安全删除目录(target_dir: Path) -> None:
+    """仅允许删除工作区内的目录，避免误删"""
+    if not target_dir.exists():
+        return
+
+    root_str = _规范化绝对路径(ROOT)
+    target_str = _规范化绝对路径(target_dir)
+    if os.path.commonpath([root_str, target_str]) != root_str:
+        raise ValueError(f"拒绝删除工作区外目录: {target_dir}")
+
+    shutil.rmtree(target_dir)
+
+
+def _停止gradle守护进程(android_dir: Path) -> None:
+    """尽量停止 Gradle 守护进程，避免 Windows 下文件锁导致清理失败"""
+    gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    if not gradlew.exists():
+        return
+
+    try:
+        subprocess.run(
+            [str(gradlew), "--stop"],
+            cwd=android_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def _预清理陈旧android缓存(android_dir: Path) -> None:
+    """检测并清理目录迁移后遗留的 React Native 自动链接缓存"""
+    autolinking_dir = android_dir / "build" / "generated" / "autolinking"
+    autolinking_file = autolinking_dir / "autolinking.json"
+    if not autolinking_file.exists():
+        return
+
+    try:
+        cached_config = json.loads(autolinking_file.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    cached_root = cached_config.get("root")
+    if not cached_root:
+        return
+
+    expected_root = _规范化绝对路径(ROBOT_PHONE)
+    actual_root = _规范化绝对路径(Path(cached_root))
+    if actual_root == expected_root:
+        return
+
+    print("⚠️  检测到 React Native 自动链接缓存仍指向旧目录，正在自动清理...")
+    print(f"   当前项目目录: {ROBOT_PHONE}")
+    print(f"   缓存记录目录: {cached_root}")
+
+    _停止gradle守护进程(android_dir)
+    _安全删除目录(autolinking_dir)
+
+    # Windows 下原生模块目录偶发被旧构建过程锁住，一并清掉可避免二次失败。
+    screens_build_dir = ROBOT_PHONE / "node_modules" / "react-native-screens" / "android" / "build"
+    _安全删除目录(screens_build_dir)
+
+    print("✅  旧缓存已清理，本次构建将重新生成自动链接配置")
+
+
 def _构建并处理apk(variant: str, gradle_task: str) -> int:
     android_dir = ROBOT_PHONE / "android"
     gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
     if not gradlew.exists():
         print(f"❌ 未找到 gradlew: {gradlew}")
         return 1
+    _预清理陈旧android缓存(android_dir)
     print(f"🔨 开始构建 Android {variant.capitalize()} APK...")
     result = subprocess.run(
         [str(gradlew), gradle_task],

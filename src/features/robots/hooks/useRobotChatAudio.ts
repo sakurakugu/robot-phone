@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import RNBlobUtil from 'react-native-blob-util';
-import type { AudioStreamState } from '../services/RobotChat';
+import type { AudioStreamState } from '../services/robotChat';
 import type { WsMessage } from './useRobotWebSocket';
 
 function trimConversationSet(target: Set<string>) {

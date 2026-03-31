@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
-import type { MessageTarget } from '../services/RobotChat';
+import type { MessageTarget } from '../services/robotChat';
 import { VoiceRecordButton } from './VoiceRecordButton';
 
 type RobotChatComposerProps = {
