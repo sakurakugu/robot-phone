@@ -37,7 +37,7 @@ type JoystickProps = {
 };
 
 /**
- * 模拟摇杆 —— 仿 app\robot-cloud\前端\src\components\JoystickPad.vue
+ * 模拟摇杆 —— 仿 app\cloud-server\前端\src\components\JoystickPad.vue
  * 坐标约定：上为 +x，左为 +y
  *
  * 支持两种使用模式：
