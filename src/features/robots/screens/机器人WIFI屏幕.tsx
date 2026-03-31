@@ -1,19 +1,19 @@
 import { useRoute } from '@react-navigation/native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
+    FlatList,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    View,
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
+import { RobotClient } from '../api/robotClient';
 import { ActionRow, InputRow, Section } from '../components/SettingsComponents';
-import { RobotClient } from '../robotClient';
 
 type RouteParams = {
   robotUuid: string;

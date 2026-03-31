@@ -1,4 +1,4 @@
-import type { ConversationRecord } from './types';
+import type { ConversationRecord } from '../types';
 
 export type MessageTarget = 'ai' | 'robot';
 

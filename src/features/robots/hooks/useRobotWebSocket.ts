@@ -18,9 +18,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getAuthToken } from '../../auth/AuthContext';
 import { getActiveEnvironment } from '../../../shared/config/environment';
-import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../phoneIdentity';
+import { getAuthToken } from '../../auth/AuthContext';
+import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../device/phoneIdentity';
 
 // 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）
 const WS_CHAT_PATH = '/api/v1/phone/business';

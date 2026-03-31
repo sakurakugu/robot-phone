@@ -1,23 +1,23 @@
 import {
-  ArrowLeft,
-  Bot,
-  Mic,
-  MicOff,
-  Smartphone,
-  Thermometer,
-  Wifi,
-  WifiOff,
+    ArrowLeft,
+    Bot,
+    Mic,
+    MicOff,
+    Smartphone,
+    Thermometer,
+    Wifi,
+    WifiOff,
 } from 'lucide-react-native';
 import React from 'react';
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../../../app/theme/palette';
-import type { ControlMode } from '../operation';
+import type { ControlMode } from '../services/operation';
 import { ToggleSwitch } from './ToggleSwitch';
 
 type RobotOperationTopBarProps = {

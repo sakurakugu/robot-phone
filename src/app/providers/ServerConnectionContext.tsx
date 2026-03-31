@@ -19,15 +19,15 @@
  */
 
 import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from 'react';
+import { getAuthToken } from '../../features/auth/AuthContext';
 import { getActiveEnvironment } from '../../shared/config/environment';
-import { getAuthToken } from '../auth/AuthContext';
 
 const WS_PHONE_PATH = '/api/v1/phone/business';
 const CONNECT_TIMEOUT_MS = 8000;

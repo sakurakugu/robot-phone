@@ -1,11 +1,11 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppPreferences } from '../../../app/preferences/AppPreferences';
@@ -17,7 +17,7 @@ import { RobotOperationTopBar } from '../components/RobotOperationTopBar';
 import { RtspVideoPlayer } from '../components/RtspVideoPlayer';
 import { useRobotOperationJoystick } from '../hooks/useRobotOperationJoystick';
 import { useRobotOperationScreen } from '../hooks/useRobotOperationScreen';
-import type { RobotOperationRouteParams } from '../operation';
+import type { RobotOperationRouteParams } from '../services/operation';
 
 type RobotOperationStackParamList = {
   机器人操作: RobotOperationRouteParams;

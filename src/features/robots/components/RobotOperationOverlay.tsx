@@ -1,26 +1,26 @@
 import React from 'react';
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type DimensionValue,
-  type GestureResponderEvent,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    type DimensionValue,
+    type GestureResponderEvent,
 } from 'react-native';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../../../app/theme/palette';
 import {
-  ACTION_BUTTONS,
-  type RobotOperationActionButton,
-} from '../operation';
+    ACTION_BUTTONS,
+    type RobotOperationActionButton,
+} from '../services/operation';
 import type {
-  JoystickMovePayload,
-  JoystickPadHandle,
+    JoystickMovePayload,
+    JoystickPadHandle,
 } from './JoystickPad';
 import { JoystickPad } from './JoystickPad';
 import {
-  type DanmakuItem,
-  StatusDanmaku,
+    StatusDanmaku,
+    type DanmakuItem,
 } from './StatusDanmaku';
 import { VoiceRecordButton } from './VoiceRecordButton';
 

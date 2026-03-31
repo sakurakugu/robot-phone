@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type {
-  GestureResponderEvent,
-  LayoutRectangle,
-  View,
+    GestureResponderEvent,
+    LayoutRectangle,
+    View,
 } from 'react-native';
 import type {
-  JoystickMovePayload,
-  JoystickPadHandle,
+    JoystickMovePayload,
+    JoystickPadHandle,
 } from '../components/JoystickPad';
-import type { ControlMode } from '../operation';
-import { JOYSTICK_HIT_RADIUS } from '../operation';
+import type { ControlMode } from '../services/operation';
+import { JOYSTICK_HIT_RADIUS } from '../services/operation';
 import type { UseDirectRobotControlResult } from './useDirectRobotControl';
 
 type UseRobotOperationJoystickOptions = {

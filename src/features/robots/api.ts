@@ -1,11 +1,11 @@
 import { getApiBaseUrl } from '../../shared/config/environment';
 import { http } from '../../shared/net/http';
 import {
-    getLocalRobot,
-    loadLocalRobots,
-    removeLocalRobot,
-    upsertLocalRobot,
-} from './localRobotStorage';
+  getLocalRobot,
+  loadLocalRobots,
+  removeLocalRobot,
+  upsertLocalRobot,
+} from './storage/localRobotStorage';
 import type {
   ConversationHistoryResult,
   DiscoveredRobot,

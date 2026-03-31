@@ -2,11 +2,11 @@ import { useNavigation } from '@react-navigation/native';
 import { Cloud, CloudOff } from 'lucide-react-native';
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useServerConnection } from '../../../app/providers/ServerConnectionContext';
 import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
 import { useAuth } from '../../auth/AuthContext';
-import { useServerConnection } from '../../server/ServerConnectionContext';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },

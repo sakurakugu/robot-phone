@@ -16,14 +16,14 @@ import {
     updateRobot,
     updateRobotAudioRoute,
 } from '../api';
+import { RobotClient } from '../api/robotClient';
 import {
     ActionRow,
     InfoRow,
     InputRow,
     Section,
 } from '../components/SettingsComponents';
-import { getOrCreatePhoneDeviceId } from '../phoneIdentity';
-import { RobotClient } from '../robotClient';
+import { getOrCreatePhoneDeviceId } from '../device/phoneIdentity';
 import {
     installPackageFromBase64,
     PACKAGE_INSTALL_ORDER,
