@@ -1,20 +1,20 @@
 import {
-    NavigationContainer,
-    DarkTheme as NavigationDarkTheme,
-    DefaultTheme as NavigationDefaultTheme,
+  NavigationContainer,
+  DarkTheme as NavigationDarkTheme,
+  DefaultTheme as NavigationDefaultTheme,
 } from '@react-navigation/native';
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from '../features/auth/AuthContext';
+import { AuthProvider } from '../features/auth/providers/AuthContext';
 import { UpdateDialog } from '../features/settings/components/UpdateDialog';
 import { initEnvironments } from '../shared/config/environment';
 import { ToastComponent } from '../shared/ui/Toast';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { RootStack } from './navigation/RootStack';
 import {
-    AppPreferencesProvider,
-    useAppPreferences,
+  AppPreferencesProvider,
+  useAppPreferences,
 } from './preferences/AppPreferences';
 import { ServerConnectionProvider } from './providers/ServerConnectionContext';
 import { usePalette } from './theme/palette';

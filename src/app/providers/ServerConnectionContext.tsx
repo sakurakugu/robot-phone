@@ -19,14 +19,14 @@
  */
 
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
-import { getAuthToken } from '../../features/auth/AuthContext';
+import { getAuthToken } from '../../features/auth/providers/AuthContext';
 import { getActiveEnvironment } from '../../shared/config/environment';
 
 const WS_PHONE_PATH = '/api/v1/phone/business';

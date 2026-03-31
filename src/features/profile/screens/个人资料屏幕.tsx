@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Screen } from '../../../shared/ui/Screen';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/providers/AuthContext';
 
 export function PersonalProfileScreen() {
   const palette = usePalette();

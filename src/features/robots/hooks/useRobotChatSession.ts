@@ -1,14 +1,14 @@
-import type { FlatList } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FlatList } from 'react-native';
 import { getConversationHistory } from '../api';
 import {
   buildVisionImageUrl,
   HISTORY_PAGE_SIZE,
-  type MessageTarget,
   mapConversationRecordsToChatMessages,
   parseActionFormat,
+  type MessageTarget,
   type RobotChatMessage,
-} from '../robotChat';
+} from '../services/RobotChat';
 import { useRobotChatAudio } from './useRobotChatAudio';
 import { useRobotWebSocket } from './useRobotWebSocket';
 

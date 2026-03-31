@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Robot } from './types';
+import type { Robot } from '../types';
 
 const STORAGE_KEY = 'robot_list';
 

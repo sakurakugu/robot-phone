@@ -1,4 +1,4 @@
-import { getAuthToken } from '../../features/auth/AuthContext';
+import { getAuthToken } from '../../features/auth/providers/AuthContext';
 import { getApiBaseUrl } from '../config/environment';
 
 type ApiEnvelope<T> = {

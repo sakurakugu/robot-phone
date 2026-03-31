@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Toast } from '../../../shared/ui/Toast';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../providers/AuthContext';
 
 export function AuthScreen() {
   const palette = usePalette();

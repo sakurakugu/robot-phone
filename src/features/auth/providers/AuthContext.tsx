@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { getApiBaseUrl } from '../../shared/config/environment';
+import { getApiBaseUrl } from '../../../shared/config/environment';
 
 const TOKEN_KEY = '@robot:auth_token';
 const USER_KEY = '@robot:auth_user';

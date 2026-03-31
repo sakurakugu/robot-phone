@@ -4,7 +4,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/providers/AuthContext';
 
 const menu = [
   { id: 'profile', title: '个人资料', desc: '查看账号详细信息' },

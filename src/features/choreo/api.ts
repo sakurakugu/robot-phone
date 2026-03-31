@@ -6,7 +6,7 @@
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { getApiBaseUrl } from '../../shared/config/environment';
 import { http } from '../../shared/net/http';
-import { getAuthToken } from '../auth/AuthContext';
+import { getAuthToken } from '../auth/providers/AuthContext';
 import type { ChoreoProject } from './types';
 
 /**

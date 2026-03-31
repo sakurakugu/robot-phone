@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getActiveEnvironment } from '../../../shared/config/environment';
-import { getAuthToken } from '../../auth/AuthContext';
+import { getAuthToken } from '../../auth/providers/AuthContext';
 import { getOrCreatePhoneDeviceId, getPhoneSessionId } from '../device/phoneIdentity';
 
 // 后端 WebSocket 对话通道路径（与后端 server.ts 中的 phonePath + '/business' 一致）

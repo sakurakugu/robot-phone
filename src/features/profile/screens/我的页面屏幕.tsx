@@ -6,7 +6,7 @@ import { useServerConnection } from '../../../app/providers/ServerConnectionCont
 import { usePalette } from '../../../app/theme/palette';
 import { InfoCard } from '../../../shared/ui/InfoCard';
 import { Screen } from '../../../shared/ui/Screen';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/providers/AuthContext';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
