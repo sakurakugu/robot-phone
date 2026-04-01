@@ -14,14 +14,30 @@ const USER_KEY = '@robot:auth_user';
 const MODE_KEY = '@robot:auth_mode';
 
 type AccountRole = 'user' | 'admin' | 'super_admin';
+type RegistrationApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 type AuthUser = {
   id: string;
   username: string;
   role: AccountRole;
+  approvalStatus: RegistrationApprovalStatus;
+  approvalReviewedAt: string | null;
+  approvalReviewedBy: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
+};
+
+type RegisterResult = {
+  token: string | null;
+  user: AuthUser;
+  requiresApproval: boolean;
+  message: string;
+};
+
+type RegisterConfig = {
+  registerEnabled: boolean;
+  registerApprovalRequired: boolean;
 };
 
 type AuthState = {
@@ -32,10 +48,13 @@ type AuthState = {
 };
 
 type AuthContextValue = AuthState & {
+  registerEnabled: boolean;
+  registerApprovalRequired: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   enterGuestMode: () => Promise<void>;
+  refreshRegisterConfig: () => Promise<void>;
 };
 
 let currentToken = '';
@@ -66,10 +85,32 @@ async function requestAuth(
     throw new Error(payload.error || payload.message || '认证失败');
   }
 
-  return payload.data as { token: string; user: AuthUser };
+  return payload.data;
+}
+
+async function requestRegisterConfig(): Promise<RegisterConfig> {
+  const response = await fetch(`${getApiBaseUrl()}/auth/register-config`, {
+    method: 'GET',
+    headers: {
+      'x-client-type': 'mobile',
+      'x-device-name': 'RobotPhone',
+    },
+  });
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : {};
+  if (!response.ok || payload.success === false) {
+    throw new Error(payload.error || payload.message || '获取注册配置失败');
+  }
+
+  return payload.data as RegisterConfig;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [registerConfig, setRegisterConfig] = useState<RegisterConfig>({
+    registerEnabled: true,
+    registerApprovalRequired: false,
+  });
   const [state, setState] = useState<AuthState>({
     mode: 'guest',
     user: null,
@@ -93,6 +134,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  const refreshRegisterConfig = useCallback(async () => {
+    try {
+      const nextConfig = await requestRegisterConfig();
+      setRegisterConfig(nextConfig);
+    } catch {
+      setRegisterConfig({
+        registerEnabled: true,
+        registerApprovalRequired: false,
+      });
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -119,12 +172,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token: tokenValue,
         bootstrapped: true,
       });
+      await refreshRegisterConfig();
     })();
-  }, []);
+  }, [refreshRegisterConfig]);
 
   const login = useCallback(
     async (username: string, password: string) => {
-      const data = await requestAuth('/auth/login', { username, password });
+      const data = await requestAuth('/auth/login', { username, password }) as {
+        token: string;
+        user: AuthUser;
+      };
       await persist({
         mode: 'authenticated',
         user: data.user,
@@ -136,12 +193,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async (username: string, password: string) => {
-      const data = await requestAuth('/auth/register', { username, password });
-      await persist({
-        mode: 'authenticated',
-        user: data.user,
-        token: data.token,
-      });
+      const data = await requestAuth('/auth/register', { username, password }) as RegisterResult;
+      if (data.token) {
+        await persist({
+          mode: 'authenticated',
+          user: data.user,
+          token: data.token,
+        });
+      } else {
+        await persist({ mode: 'guest', user: null, token: '' });
+      }
+      return data;
     },
     [persist],
   );
@@ -171,12 +233,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
+      registerEnabled: registerConfig.registerEnabled,
+      registerApprovalRequired: registerConfig.registerApprovalRequired,
       login,
       register,
       logout,
       enterGuestMode,
+      refreshRegisterConfig,
     }),
-    [state, login, register, logout, enterGuestMode],
+    [
+      state,
+      registerConfig.registerEnabled,
+      registerConfig.registerApprovalRequired,
+      login,
+      register,
+      logout,
+      enterGuestMode,
+      refreshRegisterConfig,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

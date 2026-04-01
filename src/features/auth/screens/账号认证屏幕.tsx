@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
 import { Toast } from '../../../shared/ui/Toast';
@@ -9,7 +9,14 @@ import { useAuth } from '../providers/AuthContext';
 export function AuthScreen() {
   const palette = usePalette();
   const navigation = useNavigation<any>();
-  const { login, register, enterGuestMode } = useAuth();
+  const {
+    login,
+    register,
+    enterGuestMode,
+    registerEnabled,
+    registerApprovalRequired,
+    refreshRegisterConfig,
+  } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,13 +38,30 @@ export function AuthScreen() {
       btn: { backgroundColor: palette.primary },
       btnText: { color: '#fff' },
       guestText: { color: palette.textMuted },
+      noticeText: { color: palette.textMuted },
     }),
     [palette],
   );
 
+  useEffect(() => {
+    refreshRegisterConfig().catch(() => {});
+  }, [refreshRegisterConfig]);
+
+  useEffect(() => {
+    if (!registerEnabled && mode === 'register') {
+      setMode('login');
+    }
+  }, [mode, registerEnabled]);
+
   const submit = async () => {
     if (!username.trim() || !password) {
       Toast.show('请输入用户名和密码', Toast.SHORT);
+      return;
+    }
+
+    if (mode === 'register' && !registerEnabled) {
+      Toast.show('当前已关闭新用户注册', Toast.SHORT);
+      setMode('login');
       return;
     }
 
@@ -46,7 +70,13 @@ export function AuthScreen() {
       if (mode === 'login') {
         await login(username.trim(), password);
       } else {
-        await register(username.trim(), password);
+        const result = await register(username.trim(), password);
+        if (result.requiresApproval) {
+          Toast.show(result.message || '注册申请已提交，请等待管理员审核', Toast.SHORT);
+          setMode('login');
+          setPassword('');
+          return;
+        }
       }
       Toast.show(mode === 'login' ? '登录成功' : '注册成功', Toast.SHORT);
       if (navigation.canGoBack()) {
@@ -86,25 +116,38 @@ export function AuthScreen() {
               登录
             </Text>
           </Pressable>
-          <Pressable
-            style={[
-              styles.tab,
-              mode === 'register' && { borderBottomColor: palette.primary },
-            ]}
-            onPress={() => setMode('register')}
-          >
-            <Text
+          {registerEnabled ? (
+            <Pressable
               style={[
-                styles.tabText,
-                mode === 'register'
-                  ? [themed.tabActive, styles.tabTextActive]
-                  : themed.tabInactive,
+                styles.tab,
+                mode === 'register' && { borderBottomColor: palette.primary },
               ]}
+              onPress={() => setMode('register')}
             >
-              注册
-            </Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.tabText,
+                  mode === 'register'
+                    ? [themed.tabActive, styles.tabTextActive]
+                    : themed.tabInactive,
+                ]}
+              >
+                注册
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
+
+        {!registerEnabled ? (
+          <Text style={[styles.noticeText, themed.noticeText]}>
+            当前已关闭新用户注册，请联系管理员处理。
+          </Text>
+        ) : null}
+        {registerEnabled && mode === 'register' && registerApprovalRequired ? (
+          <Text style={[styles.noticeText, themed.noticeText]}>
+            当前注册需要主管理员审核，通过后才能登录。
+          </Text>
+        ) : null}
 
         <TextInput
           placeholder="用户名"
@@ -141,7 +184,13 @@ export function AuthScreen() {
           disabled={loading}
         >
           <Text style={[styles.btnText, themed.btnText]}>
-            {loading ? '处理中...' : mode === 'login' ? '登录' : '注册并登录'}
+            {loading
+              ? '处理中...'
+              : mode === 'login'
+                ? '登录'
+                : registerApprovalRequired
+                  ? '提交注册'
+                  : '注册并登录'}
           </Text>
         </Pressable>
 
@@ -195,6 +244,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     marginBottom: 4,
+  },
+  noticeText: {
+    fontSize: 13,
+    lineHeight: 20,
   },
   tabs: {
     flexDirection: 'row',
