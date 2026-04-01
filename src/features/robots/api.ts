@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from '../../shared/config/environment';
 import { http } from '../../shared/net/http';
+import { uuidv7 } from '../../shared/utils/uuid';
 import {
   getLocalRobot,
   loadLocalRobots,
@@ -12,15 +13,6 @@ import type {
   Robot,
   RobotForm,
 } from './types';
-
-// ── 构造一个本地占位 Robot 对象（读取服务器时无法使用时的临时对象） ──
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.floor(Math.random() * 16);
-    const v = c === 'x' ? r : (r % 4) + 8;
-    return v.toString(16);
-  });
-}
 
 function buildLocalRobot(uuid: string, payload: RobotForm, now: string): Robot {
   return {
@@ -112,14 +104,15 @@ export async function fetchRobotGroups(): Promise<string[]> {
  */
 export async function createRobot(payload: RobotForm): Promise<Robot> {
   const now = new Date().toISOString();
-  const uuid = payload.uuid ?? generateUUID();
+  const uuid = payload.uuid ?? uuidv7();
   const localRobot = buildLocalRobot(uuid, payload, now);
   await upsertLocalRobot(localRobot);
+  const payloadWithUuid: RobotForm = { ...payload, uuid };
 
   // 后台同步，成功后以服务器返回值覆盖本地（保留服务器字段如 registered_at）
   // payload.uuid 已包含 uuid，服务器在支持的情况下会以此为最终 UUID
   http
-    .post<Robot>('/robots', payload)
+    .post<Robot>('/robots', payloadWithUuid)
     .then(r => upsertLocalRobot(r))
     .catch(() => { /* 离线时静默失败，本地数据已保存 */ });
 
