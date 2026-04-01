@@ -11,7 +11,6 @@ const STORAGE_KEY_CUSTOM = '@robot:custom_environments';
 const STORAGE_KEY_ACTIVE = '@robot:active_environment_id';
 const STORAGE_KEY_DEFAULT_MIGRATED = '@robot:active_environment_default_migrated_v1';
 const DEFAULT_ACTIVE_ENVIRONMENT_ID = 'server';
-const LEGACY_SERVER_HOST = 'http://106.53.174.61:9000';
 
 const localHost =
   Platform.OS === 'android' ? 'http://10.0.2.2:9000' : 'http://127.0.0.1:9000';
@@ -25,22 +24,14 @@ const DEFAULT_ENVIRONMENTS: AppEnvironment[] = [
 let environments: AppEnvironment[] = [...DEFAULT_ENVIRONMENTS];
 let activeEnvironmentId = DEFAULT_ACTIVE_ENVIRONMENT_ID;
 
-function normalizeEnvironment(env: AppEnvironment): AppEnvironment {
-  if (env.id === 'server' && env.baseUrl === LEGACY_SERVER_HOST) {
-    return { ...env, baseUrl: serverHost };
-  }
-  return env;
-}
-
 function isDefaultEnvironment(id: string): boolean {
   return DEFAULT_ENVIRONMENTS.some(env => env.id === id);
 }
 
 function applyCustomEnvironments(custom: AppEnvironment[]): void {
-  const normalizedCustom = custom.map(normalizeEnvironment);
-  const customMap = new Map(normalizedCustom.map(item => [item.id, item]));
+  const customMap = new Map(custom.map(item => [item.id, item]));
   const mergedDefaults = DEFAULT_ENVIRONMENTS.map(item => customMap.get(item.id) || item);
-  const customOnly = normalizedCustom.filter(item => !isDefaultEnvironment(item.id));
+  const customOnly = custom.filter(item => !isDefaultEnvironment(item.id));
   environments = [...mergedDefaults, ...customOnly];
 }
 
@@ -52,14 +43,9 @@ export async function initEnvironments(): Promise<void> {
       AsyncStorage.getItem(STORAGE_KEY_ACTIVE),
       AsyncStorage.getItem(STORAGE_KEY_DEFAULT_MIGRATED),
     ]);
-    let hasEnvironmentMigration = false;
     if (rawEnvs) {
       const custom: AppEnvironment[] = JSON.parse(rawEnvs);
-      const normalizedCustom = custom.map(normalizeEnvironment);
-      hasEnvironmentMigration = normalizedCustom.some(
-        (item, index) => item.baseUrl !== custom[index]?.baseUrl,
-      );
-      applyCustomEnvironments(normalizedCustom);
+      applyCustomEnvironments(custom);
     }
     const shouldMigrateLegacyLocal =
       rawMigrated !== '1' && rawActiveId === 'local';
@@ -76,9 +62,6 @@ export async function initEnvironments(): Promise<void> {
     }
     if (rawMigrated !== '1') {
       await AsyncStorage.setItem(STORAGE_KEY_DEFAULT_MIGRATED, '1');
-    }
-    if (hasEnvironmentMigration) {
-      saveCustomEnvironments();
     }
   } catch {
     // 读取失败时保持默认值
