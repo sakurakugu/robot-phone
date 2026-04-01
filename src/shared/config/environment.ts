@@ -9,16 +9,20 @@ export type AppEnvironment = {
 
 const STORAGE_KEY_CUSTOM = '@robot:custom_environments';
 const STORAGE_KEY_ACTIVE = '@robot:active_environment_id';
+const STORAGE_KEY_DEFAULT_MIGRATED = '@robot:active_environment_default_migrated_v1';
+const DEFAULT_ACTIVE_ENVIRONMENT_ID = 'server';
 
 const localHost =
   Platform.OS === 'android' ? 'http://10.0.2.2:9000' : 'http://127.0.0.1:9000';
+const serverHost = 'http://106.53.174.61:9000';
 
 const DEFAULT_ENVIRONMENTS: AppEnvironment[] = [
+  { id: 'server', name: '服务器环境', baseUrl: serverHost },
   { id: 'local', name: '模拟器开发', baseUrl: localHost },
 ];
 
 let environments: AppEnvironment[] = [...DEFAULT_ENVIRONMENTS];
-let activeEnvironmentId = 'local';
+let activeEnvironmentId = DEFAULT_ACTIVE_ENVIRONMENT_ID;
 
 function isDefaultEnvironment(id: string): boolean {
   return DEFAULT_ENVIRONMENTS.some(env => env.id === id);
@@ -34,19 +38,30 @@ function applyCustomEnvironments(custom: AppEnvironment[]): void {
 /** 应用启动时调用，从 AsyncStorage 加载持久化的自定义环境 */
 export async function initEnvironments(): Promise<void> {
   try {
-    const [rawEnvs, rawActiveId] = await Promise.all([
+    const [rawEnvs, rawActiveId, rawMigrated] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY_CUSTOM),
       AsyncStorage.getItem(STORAGE_KEY_ACTIVE),
+      AsyncStorage.getItem(STORAGE_KEY_DEFAULT_MIGRATED),
     ]);
     if (rawEnvs) {
       const custom: AppEnvironment[] = JSON.parse(rawEnvs);
       applyCustomEnvironments(custom);
     }
+    const shouldMigrateLegacyLocal =
+      rawMigrated !== '1' && rawActiveId === 'local';
     if (rawActiveId) {
       const exists = environments.some(e => e.id === rawActiveId);
       if (exists) {
-        activeEnvironmentId = rawActiveId;
+        activeEnvironmentId = shouldMigrateLegacyLocal
+          ? DEFAULT_ACTIVE_ENVIRONMENT_ID
+          : rawActiveId;
       }
+    }
+    if (shouldMigrateLegacyLocal) {
+      await AsyncStorage.setItem(STORAGE_KEY_ACTIVE, activeEnvironmentId);
+    }
+    if (rawMigrated !== '1') {
+      await AsyncStorage.setItem(STORAGE_KEY_DEFAULT_MIGRATED, '1');
     }
   } catch {
     // 读取失败时保持默认值
@@ -101,7 +116,8 @@ export function removeEnvironment(id: string): void {
   }
   environments = environments.filter(e => e.id !== id);
   if (activeEnvironmentId === id) {
-    activeEnvironmentId = environments[0]?.id ?? 'local';
+    activeEnvironmentId =
+      environments[0]?.id ?? DEFAULT_ACTIVE_ENVIRONMENT_ID;
     saveActiveId();
   }
   saveCustomEnvironments();
