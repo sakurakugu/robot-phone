@@ -20,16 +20,27 @@ bundle exec pod install
 
 ```bash
 cd ./
-# npm start
-npm run android
+python tools/1.启动手机端.py --android
 ```
 
 ### iOS
 
 ```bash
 cd ./
-npm start
-npm run ios
+python tools/1.启动手机端.py --ios
+```
+
+### Metro / 构建 / 状态
+
+```bash
+# 仅启动 Metro
+python tools/1.启动手机端.py --metro
+
+# 查看状态
+python tools/1.启动手机端.py --status
+
+# 构建 APK
+python tools/1.启动手机端.py --build --release
 ```
 
 ### 其他

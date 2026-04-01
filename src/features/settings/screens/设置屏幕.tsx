@@ -288,14 +288,9 @@ export function SettingsScreen() {
 
       <Section title="关于">
         <SettingsRow
-          label="反馈"
-          onPress={() => navigation.navigate('反馈')}
-        />
-        <SettingsRow
           label="应用名称"
           value={DeviceInfo.getApplicationName()}
           showChevron={false}
-          isLast={false}
         />
         <SettingsRow
           label="版本"

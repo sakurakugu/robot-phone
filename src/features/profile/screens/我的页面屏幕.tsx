@@ -10,7 +10,8 @@ import { useAuth } from '../../auth/providers/AuthContext';
 
 const menu = [
   { id: 'm1', title: '设置', desc: '语言、主题、通知偏好' },
-  { id: 'm2', title: '参数管理', desc: '速度、阈值、巡检间隔等 (占位，好看)' },
+  { id: 'm2', title: '反馈', desc: '提交问题、建议和使用体验' },
+  { id: 'm3', title: '参数管理', desc: '速度、阈值、巡检间隔等 (占位，好看)' },
 ];
 
 export function ProfileScreen() {
@@ -89,6 +90,10 @@ export function ProfileScreen() {
             onPress={() => {
               if (item.id === 'm1') {
                 navigation.navigate('设置');
+                return;
+              }
+              if (item.id === 'm2') {
+                navigation.navigate('反馈');
               }
             }}
           />

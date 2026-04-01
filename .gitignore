@@ -77,3 +77,7 @@ __pycache__/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# robot-onboard 的 python 包
+robot-packages/
+.cache/

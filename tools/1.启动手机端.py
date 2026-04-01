@@ -1,3 +1,5 @@
+"""跨平台手机端启动器。"""
+
 import argparse
 import json
 import os
@@ -45,22 +47,43 @@ from scripts.start.utils import (
 )
 
 ROBOT_PHONE = ROOT
+SCRIPT_NAME = Path(__file__).name
+PID_DIR = ROOT / ".cache" / "pid"
+
+
+def echo(msg: str) -> None:
+    print(f"==> {msg}")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="tools/4.启动手机端.py", add_help=False)
-    parser.add_argument("--start", "-s", action="store_true")
-    parser.add_argument("--stop", "-x", action="store_true")
-    parser.add_argument("--restart", "-r", action="store_true")
-    parser.add_argument("--android", "-a", action="store_true")
-    parser.add_argument("--ios", "-i", action="store_true")
-    parser.add_argument("--metro", "-m", action="store_true")
-    parser.add_argument("--build", "-b", action="store_true")
-    parser.add_argument("--apk", "-ba", action="store_true")
-    parser.add_argument("--debug", "-d", action="store_true")
-    parser.add_argument("--release", "-rel", action="store_true")
-    parser.add_argument("--update_version", "-u", nargs="?", const=True, help="更新版本号 (e.g. 1.2.3)")
-    parser.add_argument("--help", "-h", action="store_true")
+    parser = argparse.ArgumentParser(description="跨平台手机端启动器")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--start", "-s", action="store_true", help="启动手机端")
+    group.add_argument("--stop", "-x", action="store_true", help="停止手机端")
+    group.add_argument("--restart", "-r", action="store_true", help="重启手机端（默认）")
+    group.add_argument("--status", action="store_true", help="查看手机端状态")
+    group.add_argument("--build", "-b", action="store_true", help="构建 Android APK")
+    group.add_argument("--apk", "-ba", action="store_true", help="构建 Android APK")
+    group.add_argument(
+        "--update-version",
+        "--update_version",
+        "-u",
+        dest="update_version",
+        nargs="?",
+        const=True,
+        help="更新版本号（例如 1.2.3）",
+    )
+    parser.add_argument(
+        "action",
+        nargs="?",
+        help="可选动作：start/stop/restart/status/android/ios/metro/build-apk/update-version",
+    )
+    target_group = parser.add_mutually_exclusive_group()
+    target_group.add_argument("--android", "-a", action="store_true", help="使用 Android")
+    target_group.add_argument("--ios", "-i", action="store_true", help="使用 iOS")
+    target_group.add_argument("--metro", "-m", action="store_true", help="仅启动 Metro")
+    parser.add_argument("--debug", "-d", action="store_true", help="构建 Debug APK")
+    parser.add_argument("--release", "-rel", action="store_true", help="构建 Release APK（默认）")
     return parser.parse_args()
 
 
@@ -70,6 +93,16 @@ def _default_action() -> str:
     if sys.platform.startswith("linux"):
         return "android"
     return "ios"
+
+
+def _resolve_target(ns: argparse.Namespace) -> str:
+    if ns.android:
+        return "android"
+    if ns.ios:
+        return "ios"
+    if ns.metro:
+        return "metro"
+    return _default_action()
 
 
 def resolve_action(ns: argparse.Namespace) -> Tuple[str, str]:
@@ -89,44 +122,33 @@ def resolve_action(ns: argparse.Namespace) -> Tuple[str, str]:
 
     # 然后确定操作类型
     if ns.start:
-        return ("metro", build_type)
+        return (_resolve_target(ns), build_type)
     if ns.stop:
         return ("stop", build_type)
     if ns.restart:
         return ("restart", build_type)
-    if ns.android:
-        return ("android", build_type)
-    if ns.ios:
-        return ("ios", build_type)
-    if ns.metro:
-        return ("metro", build_type)
+    if ns.status:
+        return ("status", build_type)
+    if ns.android or ns.ios or ns.metro:
+        return (_resolve_target(ns), build_type)
+    if ns.action:
+        raw = ns.action.strip().lower().replace("_", "-")
+        if raw in {"android", "ios", "metro"}:
+            return (raw, build_type)
+        if raw == "start":
+            return (_resolve_target(ns), build_type)
+        if raw in {"stop", "restart", "status"}:
+            return (raw, build_type)
+        if raw in {"build", "apk", "build-apk"}:
+            return ("build_apk", build_type)
+        if raw in {"update-version", "updateversion"}:
+            return ("update_version", build_type)
+        raise RuntimeError(f"不支持的动作: {ns.action}")
     if ns.apk or ns.build:
         return ("build_apk", build_type)
-    if ns.update_version:
+    if ns.update_version is not None:
         return ("update_version", build_type)
-    if ns.help:
-        return ("help", build_type)
-    return (_default_action(), build_type)
-
-
-def show_help() -> None:
-    print("机器狗控制系统 - 手机端启动脚本 (Python)")
-    print("")
-    print("用法：")
-    print("  python3 tools/4.启动手机端.py [ACTION]")
-    print("")
-    print("操作参数 (ACTION):")
-    print("  --android, -a     启动 Android（默认）")
-    print("  --ios, -i         启动 iOS")
-    print("  --metro, -m       仅启动 Metro")
-    print("  --start, -s       启动 Metro")
-    print("  --build, -b       构建 Android Release APK")
-    print("  --apk, -ba        构建 Android Release APK")
-    print("  --update_version, -u [VER] 更新版本号 (交互式或指定版本)")
-    print("  --stop, -x        停止手机端相关进程")
-    print("  --restart, -r     重启（默认平台）")
-    print("  --help, -h        显示帮助")
-    print("")
+    return ("restart", build_type)
 
 
 def _get_project_name(android_dir: Path) -> str:
@@ -188,10 +210,10 @@ def _get_android_current_version() -> Tuple[Optional[str], Optional[int]]:
 
 
 def _update_android_version(version_str: str, version_code: int) -> bool:
-    print("🤖 更新 Android 版本...")
+    echo("更新 Android 版本")
     gradle_file = ROBOT_PHONE / "android" / "app" / "build.gradle"
     if not gradle_file.exists():
-        print(f"❌ 未找到 {gradle_file}")
+        print(f"未找到 {gradle_file}")
         return False
 
     content = gradle_file.read_text(encoding="utf-8")
@@ -206,15 +228,15 @@ def _update_android_version(version_str: str, version_code: int) -> bool:
         return False
 
     gradle_file.write_text(new_content, encoding="utf-8")
-    print(f"\t✅ Android 版本已更新: {version_str} ({version_code})")
+    print(f"Android 版本已更新: {version_str} ({version_code})")
     return True
 
 
 def _update_ios_version(version_str: str, version_code: int) -> bool:
-    print("🍎 更新 iOS 版本...")
+    echo("更新 iOS 版本")
     project_file = ROBOT_PHONE / "ios" / "RobotPhone.xcodeproj" / "project.pbxproj"
     if not project_file.exists():
-        print(f"❌ 未找到 {project_file}")
+        print(f"未找到 {project_file}")
         return False
 
     content = project_file.read_text(encoding="utf-8")
@@ -229,7 +251,7 @@ def _update_ios_version(version_str: str, version_code: int) -> bool:
         return False
 
     project_file.write_text(new_content, encoding="utf-8")
-    print(f"\t✅ iOS 版本已更新: {version_str} ({version_code})")
+    print(f"iOS 版本已更新: {version_str} ({version_code})")
     return True
 
 
@@ -249,7 +271,7 @@ def update_version(ns: argparse.Namespace) -> int:
         current_ver_str = "0.0.0"
         current_ver_code = 0
 
-    print(f"ℹ️  当前版本 (Android): {current_ver_str} (Code: {current_ver_code})")
+    print(f"当前版本 (Android): {current_ver_str} (Code: {current_ver_code})")
 
     # 3. 确定新版本
     new_ver_input = ns.update_version
@@ -261,27 +283,27 @@ def update_version(ns: argparse.Namespace) -> int:
             return 1
 
     if not new_ver_input:
-        print("❌ 未提供版本号")
+        print("未提供版本号")
         return 1
 
     try:
         new_ver_str, new_ver_code = _parse_version(new_ver_input)
     except ValueError as e:
-        print(f"❌ 版本号格式错误: {e}")
+        print(f"版本号格式错误: {e}")
         return 1
 
     print(f"准备更新: {current_ver_str} -> {new_ver_str} (Code: {new_ver_code})")
 
     # 4. 安全检查
     if current_ver_code and new_ver_code < current_ver_code:
-        print(f"⚠️  警告: 新版本号 ({new_ver_code}) 小于当前版本号 ({current_ver_code})")
+        print(f"警告: 新版本号 ({new_ver_code}) 小于当前版本号 ({current_ver_code})")
         confirm = input("确认要降级吗？[y/N] ").lower()
         if confirm != 'y':
             print("已取消")
             return 0
 
     if current_ver_code and (new_ver_code - current_ver_code > 100000): # 跨度过大 (Major change)
-         print(f"⚠️  警告: 版本号跨度较大 ({current_ver_str} -> {new_ver_str})")
+         print(f"警告: 版本号跨度较大 ({current_ver_str} -> {new_ver_str})")
          confirm = input("确认更新吗？[y/N] ").lower()
          if confirm != 'y':
             print("已取消")
@@ -298,10 +320,10 @@ def update_version(ns: argparse.Namespace) -> int:
             success = False
 
     if success:
-        print(f"✨ 版本更新完成！ {current_ver_str} -> {new_ver_str}")
+        print(f"版本更新完成: {current_ver_str} -> {new_ver_str}")
         return 0
     else:
-        print("⚠️  部分更新失败或未发生变化")
+        print("部分更新失败或未发生变化")
         return 1
 
 
@@ -393,9 +415,9 @@ def _预清理陈旧android缓存(android_dir: Path) -> None:
     if actual_root == expected_root:
         return
 
-    print("⚠️  检测到 React Native 自动链接缓存仍指向旧目录，正在自动清理...")
-    print(f"   当前项目目录: {ROBOT_PHONE}")
-    print(f"   缓存记录目录: {cached_root}")
+    echo("检测到 React Native 自动链接缓存仍指向旧目录，正在自动清理")
+    print(f"当前项目目录: {ROBOT_PHONE}")
+    print(f"缓存记录目录: {cached_root}")
 
     _停止gradle守护进程(android_dir)
     _安全删除目录(autolinking_dir)
@@ -404,23 +426,23 @@ def _预清理陈旧android缓存(android_dir: Path) -> None:
     screens_build_dir = ROBOT_PHONE / "node_modules" / "react-native-screens" / "android" / "build"
     _安全删除目录(screens_build_dir)
 
-    print("✅  旧缓存已清理，本次构建将重新生成自动链接配置")
+    echo("旧缓存已清理，本次构建将重新生成自动链接配置")
 
 
 def _构建并处理apk(variant: str, gradle_task: str) -> int:
     android_dir = ROBOT_PHONE / "android"
     gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
     if not gradlew.exists():
-        print(f"❌ 未找到 gradlew: {gradlew}")
+        print(f"未找到 gradlew: {gradlew}")
         return 1
     _预清理陈旧android缓存(android_dir)
-    print(f"🔨 开始构建 Android {variant.capitalize()} APK...")
+    echo(f"开始构建 Android {variant.capitalize()} APK")
     result = subprocess.run(
         [str(gradlew), gradle_task],
         cwd=android_dir,
     )
     if result.returncode != 0:
-        print("❌ 构建失败")
+        print("构建失败")
         return result.returncode
 
     apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / variant
@@ -439,13 +461,13 @@ def _构建并处理apk(variant: str, gradle_task: str) -> int:
         apks = list(apk_dir.glob("*.apk"))
         if apks:
             size_mb = round(apks[0].stat().st_size / 1024 / 1024, 2)
-            print(f"✅ 构建成功！APK 路径：{apks[0]}  [{size_mb} MB]")
-            print(f"📂 正在打开输出目录：{apk_dir}")
+            print(f"构建成功: {apks[0]}  [{size_mb} MB]")
+            print(f"正在打开输出目录: {apk_dir}")
             _打开目录(apk_dir)
         else:
-            print(f"✅ 构建成功！但在 {apk_dir} 未找到 APK 文件。")
+            print(f"构建成功，但在 {apk_dir} 未找到 APK 文件")
     else:
-        print(f"✅ 构建成功！(未找到 APK 输出目录，检查过: {apk_dir_default} 和 {apk_dir_custom})")
+        print(f"构建成功，但未找到 APK 输出目录，检查过: {apk_dir_default} 和 {apk_dir_custom}")
     return 0
 
 
@@ -476,13 +498,13 @@ def _修复hermes_win64() -> None:
     if hermesc_exe.exists():
         return  # 已存在，无需修复
 
-    print("⚠️  未找到 hermesc.exe（Windows），正在自动下载修复...")
+    echo("未找到 hermesc.exe（Windows），正在自动下载修复")
     # 250829098.0.9 是包含 win64-bin 的最新同系列版本
     npm_url = "https://registry.npmjs.org/hermes-compiler/-/hermes-compiler-250829098.0.9.tgz"
     try:
         with tempfile.TemporaryDirectory() as tmp:
             tgz_path = os.path.join(tmp, "hermes-compiler.tgz")
-            print(f"   下载中：{npm_url}")
+            print(f"下载地址: {npm_url}")
             urllib.request.urlretrieve(npm_url, tgz_path)
             with tarfile.open(tgz_path, "r:gz") as tar:
                 members = [
@@ -490,7 +512,7 @@ def _修复hermes_win64() -> None:
                     if m.name.startswith("package/hermesc/win64-bin/")
                 ]
                 if not members:
-                    print("❌  下载的包中未找到 win64-bin 目录，请手动处理")
+                    print("下载的包中未找到 win64-bin 目录，请手动处理")
                     return
                 win64_dir.mkdir(parents=True, exist_ok=True)
                 for m in members:
@@ -502,11 +524,11 @@ def _修复hermes_win64() -> None:
                         continue
                     dest = win64_dir / fname
                     dest.write_bytes(f.read())
-        print(f"✅  hermesc.exe 已修复：{hermesc_exe}")
+        print(f"hermesc.exe 已修复: {hermesc_exe}")
     except Exception as e:
-        print(f"❌  自动修复 hermesc.exe 失败：{e}")
-        print("   请手动将 hermesc.exe 放至：")
-        print(f"   {win64_dir}")
+        print(f"自动修复 hermesc.exe 失败: {e}")
+        print("请手动将 hermesc.exe 放到目录:")
+        print(f"{win64_dir}")
 
 
 def _执行机器人套件打包() -> tuple[str, str, list[Path]]:
@@ -534,11 +556,11 @@ def _准备并放置机器人套件() -> bool:
     try:
         _, _, outputs = _执行机器人套件打包()
     except Exception as e:
-        print(f"❌ 机器人套件打包失败：{e}")
+        print(f"机器人套件打包失败: {e}")
         return False
 
     if not outputs:
-        print("❌ 未生成任何机器人套件，停止构建")
+        print("未生成任何机器人套件，停止构建")
         return False
 
     android_assets = ROBOT_PHONE / "android" / "app" / "src" / "main" / "assets" / "robot-packages"
@@ -564,13 +586,13 @@ def build_apk(build_type: str) -> int:
         return build_apk_release()
     else:
         # 如果未指定 --debug 或 --release，默认构建 Release 版本
-        print("ℹ️  未指定构建类型，默认构建 Release 版本...")
+        print("未指定构建类型，默认构建 Release 版本")
         return build_apk_release()
 
 
 def start_metro() -> List[Tuple[str, int]]:
     确保node_modules存在(ROBOT_PHONE, legacy_peer_deps=True)
-    print("🚀 启动手机端 Metro...")
+    echo("启动手机端 Metro")
     log_path = LOGS_DIR / "phone-app" / "metro.log"
     _, pid = spawn(["npm", "run", "start"], cwd=ROBOT_PHONE, log_path=log_path)
     write_pid("phone-app-metro", pid)
@@ -581,14 +603,14 @@ def start_android() -> List[Tuple[str, int]]:
     # 不手动启动 start_metro，让 run android 自动启动它
     确保node_modules存在(ROBOT_PHONE, legacy_peer_deps=True)
     procs: List[Tuple[str, int]] = []
-    print("🚀 启动手机端 Android...")
+    echo("启动手机端 Android")
     log_path = LOGS_DIR / "phone-app" / "android.log"
     device_id = _pick_android_device()
     if device_id:
-        print(f"✅ 已检测到设备：{device_id}，跳过启动模拟器")
+        print(f"已检测到设备: {device_id}，跳过启动模拟器")
         cmd = ["npm", "run", "android", "--", "--device", device_id]
     else:
-        print("ℹ️  未检测到已连接设备，将尝试启动模拟器")
+        print("未检测到已连接设备，将尝试启动模拟器")
         cmd = ["npm", "run", "android"]
     _, pid = spawn(cmd, cwd=ROBOT_PHONE, log_path=log_path)
     write_pid("phone-app-android", pid)
@@ -598,7 +620,7 @@ def start_android() -> List[Tuple[str, int]]:
 
 def start_ios() -> List[Tuple[str, int]]:
     procs = start_metro()
-    print("🚀 启动手机端 iOS...")
+    echo("启动手机端 iOS")
     log_path = LOGS_DIR / "phone-app" / "ios.log"
     _, pid = spawn(["npm", "run", "ios"], cwd=ROBOT_PHONE, log_path=log_path)
     write_pid("phone-app-ios", pid)
@@ -615,6 +637,46 @@ def stop_robot_phone() -> bool:
     if kill_port(8081):
         any_stopped = True
     return any_stopped
+
+
+def _read_pid(name: str) -> Optional[int]:
+    pid_file = PID_DIR / f"{name}.pid"
+    if not pid_file.exists():
+        return None
+    try:
+        return int(pid_file.read_text(encoding="utf-8").strip())
+    except Exception:
+        return None
+
+
+def _process_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def show_status() -> None:
+    print("手机端本地进程:")
+    for label, pid_name in (
+        ("Metro", "phone-app-metro"),
+        ("Android", "phone-app-android"),
+        ("iOS", "phone-app-ios"),
+    ):
+        pid = _read_pid(pid_name) or 0
+        state = "正在运行" if _process_exists(pid) else "已停止"
+        print(f"  {label}: {state} (PID={pid})")
+
+    metro_log = LOGS_DIR / "phone-app" / "metro.log"
+    android_log = LOGS_DIR / "phone-app" / "android.log"
+    ios_log = LOGS_DIR / "phone-app" / "ios.log"
+    print(f"Metro 端口 8081: {'已占用' if 检查端口是否被占用(8081) else '空闲'}")
+    print(f"Metro 日志: {metro_log}")
+    print(f"Android 日志: {android_log}")
+    print(f"iOS 日志: {ios_log}")
 
 
 def _pick_android_device() -> str:
@@ -637,23 +699,27 @@ def _pick_android_device() -> str:
 def main() -> int:
     print("\033]0;手机端\007")
     ns = parse_args()
-    action, build_type = resolve_action(ns)
-
-    if action == "help":
-        show_help()
-        return 0
+    try:
+        action, build_type = resolve_action(ns)
+    except Exception as exc:
+        print(f"错误: {exc}", file=sys.stderr)
+        return 1
 
     if action == "stop":
         stopped = stop_robot_phone()
         if stopped:
-            print("✅ 已停止手机端相关进程")
+            print("已停止手机端相关进程")
         else:
-            print("ℹ️  没有运行中的手机端进程")
+            print("没有运行中的手机端进程")
+        return 0
+
+    if action == "status":
+        show_status()
         return 0
 
     检查运行环境()
     if not ROBOT_PHONE.exists():
-        print(f"❌ 未找到手机端目录：{ROBOT_PHONE}")
+        print(f"未找到手机端目录: {ROBOT_PHONE}")
         return 1
 
     if action == "restart":
@@ -665,14 +731,14 @@ def main() -> int:
     # 端口检查仅针对启动服务的情况
     if action in {"metro", "ios", "android"}:
         if not _准备并放置机器人套件():
-            print("❌ 机器人套件准备失败")
+            print("机器人套件准备失败")
             return 1
         if 检查端口是否被占用(8081):
-            print("⚠️  端口 8081 被占用，尝试清理...")
+            echo("端口 8081 被占用，尝试清理")
             stop_robot_phone()
             time.sleep(1)
             if 检查端口是否被占用(8081):
-                print("⚠️  端口 8081 仍被占用，强制清理...")
+                echo("端口 8081 仍被占用，强制清理")
                 kill_port(8081)
 
     if action == "build_apk":
