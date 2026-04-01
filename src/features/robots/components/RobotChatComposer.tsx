@@ -1,6 +1,7 @@
-import { Bot, Send } from 'lucide-react-native';
-import React from 'react';
+import { Bot, Keyboard as KeyboardIcon, Mic, Send } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import {
+  Keyboard,
   Pressable,
   StyleSheet,
   TextInput,
@@ -26,7 +27,14 @@ export function RobotChatComposer({
   onSend,
 }: RobotChatComposerProps) {
   const palette = usePalette();
+  const [voiceMode, setVoiceMode] = useState(false);
   const disabled = !isConnected || !input.trim();
+  const handleToggleInputMode = useCallback(() => {
+    if (!voiceMode) {
+      Keyboard.dismiss();
+    }
+    setVoiceMode(current => !current);
+  }, [voiceMode]);
 
   return (
     <View
@@ -38,47 +46,73 @@ export function RobotChatComposer({
         },
       ]}
     >
-      <TextInput
+      <Pressable
         style={[
-          styles.input,
-          { borderColor: palette.border, color: palette.text },
+          styles.modeToggle,
+          {
+            borderColor: voiceMode ? palette.primary : palette.border,
+            backgroundColor: voiceMode ? `${palette.primary}1A` : palette.surfaceAlt,
+          },
         ]}
-        placeholder="输入消息... (支持 {{action=xxx}} 格式)"
-        placeholderTextColor={palette.textMuted}
-        value={input}
-        onChangeText={onChangeInput}
-        multiline
-        numberOfLines={2}
-      />
-      <View style={styles.btnGroup}>
-        <VoiceRecordButton audio={audioMethods} size={32} iconSize={14} />
-        <Pressable
-          style={[
-            styles.sendBtn,
-            { backgroundColor: palette.success },
-            disabled ? styles.sendBtnDisabled : styles.sendBtnEnabled,
-          ]}
-          disabled={disabled}
-          onPress={() => onSend('robot')}
-        >
-          <View style={styles.sendIconRow}>
-            <Bot size={14} color="#FFFFFF" />
+        onPress={handleToggleInputMode}
+      >
+        {voiceMode ? (
+          <KeyboardIcon size={18} color={palette.primary} />
+        ) : (
+          <Mic size={18} color={palette.textMuted} />
+        )}
+      </Pressable>
+      {voiceMode ? (
+        <VoiceRecordButton
+          audio={audioMethods}
+          variant="press"
+          size={44}
+          style={styles.voiceButton}
+        />
+      ) : (
+        <>
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: palette.border, color: palette.text },
+            ]}
+            placeholder="输入消息... (支持 {{action=xxx}} 格式)"
+            placeholderTextColor={palette.textMuted}
+            value={input}
+            onChangeText={onChangeInput}
+            multiline
+            numberOfLines={2}
+          />
+          <View style={styles.btnGroup}>
+            <Pressable
+              style={[
+                styles.sendBtn,
+                { backgroundColor: palette.success },
+                disabled ? styles.sendBtnDisabled : styles.sendBtnEnabled,
+              ]}
+              disabled={disabled}
+              onPress={() => onSend('robot')}
+            >
+              <View style={styles.sendIconRow}>
+                <Bot size={14} color="#FFFFFF" />
+              </View>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.sendBtn,
+                { backgroundColor: palette.primary },
+                disabled ? styles.sendBtnDisabled : styles.sendBtnEnabled,
+              ]}
+              disabled={disabled}
+              onPress={() => onSend('ai')}
+            >
+              <View style={styles.sendIconRow}>
+                <Send size={14} color="#FFFFFF" />
+              </View>
+            </Pressable>
           </View>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.sendBtn,
-            { backgroundColor: palette.primary },
-            disabled ? styles.sendBtnDisabled : styles.sendBtnEnabled,
-          ]}
-          disabled={disabled}
-          onPress={() => onSend('ai')}
-        >
-          <View style={styles.sendIconRow}>
-            <Send size={14} color="#FFFFFF" />
-          </View>
-        </Pressable>
-      </View>
+        </>
+      )}
     </View>
   );
 }
@@ -91,6 +125,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     padding: 10,
   },
+  modeToggle: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   input: {
     flex: 1,
     borderWidth: 1,
@@ -99,6 +141,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 14,
     maxHeight: 80,
+  },
+  voiceButton: {
+    flex: 1,
   },
   btnGroup: {
     flexDirection: 'row',
