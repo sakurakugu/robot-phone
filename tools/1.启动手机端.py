@@ -49,6 +49,53 @@ from scripts.start.utils import (
 ROBOT_PHONE = ROOT
 SCRIPT_NAME = Path(__file__).name
 PID_DIR = ROOT / ".cache" / "pid"
+默认ReactNative架构 = ("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+APK架构配置 = {
+    "all": {
+        "label": "全部",
+        "architectures": 默认ReactNative架构,
+        "suffix": "all",
+    },
+    "x86-all": {
+        "label": "x86全部",
+        "architectures": ("x86", "x86_64"),
+        "suffix": "x86-all",
+    },
+    "arm64-all": {
+        "label": "arm64全部",
+        "architectures": ("arm64-v8a", "armeabi-v7a"),
+        "suffix": "arm64-all",
+    },
+    "x86": {
+        "label": "x86",
+        "architectures": ("x86",),
+        "suffix": "x86",
+    },
+    "x86_64": {
+        "label": "x86_64",
+        "architectures": ("x86_64",),
+        "suffix": "x86_64",
+    },
+    "arm-v8a": {
+        "label": "arm-v8a",
+        "architectures": ("arm64-v8a",),
+        "suffix": "arm-v8a",
+    },
+    "arm-v7a": {
+        "label": "arm-v7a",
+        "architectures": ("armeabi-v7a",),
+        "suffix": "arm-v7a",
+    },
+}
+全量APK架构构建顺序 = [
+    "all",
+    "x86-all",
+    "arm64-all",
+    "x86",
+    "x86_64",
+    "arm-v8a",
+    "arm-v7a",
+]
 
 
 def echo(msg: str) -> None:
@@ -84,6 +131,17 @@ def parse_args() -> argparse.Namespace:
     target_group.add_argument("--metro", "-m", action="store_true", help="仅启动 Metro")
     parser.add_argument("--debug", "-d", action="store_true", help="构建 Debug APK")
     parser.add_argument("--release", "-rel", action="store_true", help="构建 Release APK（默认）")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="构建全部 7 个架构包（全部/x86全部/arm64全部/x86/x86_64/arm-v8a/arm-v7a）",
+    )
+    parser.add_argument("--x86-all", action="store_true", help="构建 x86+x86_64 双架构 APK")
+    parser.add_argument("--arm64-all", action="store_true", help="构建 arm64-v8a+armeabi-v7a 双架构 APK")
+    parser.add_argument("--x86", action="store_true", help="仅构建 x86 APK")
+    parser.add_argument("--x86_64", action="store_true", help="仅构建 x86_64 APK")
+    parser.add_argument("--arm-v8a", action="store_true", help="仅构建 arm64-v8a APK")
+    parser.add_argument("--arm-v7a", action="store_true", help="仅构建 armeabi-v7a APK")
     return parser.parse_args()
 
 
@@ -429,54 +487,122 @@ def _预清理陈旧android缓存(android_dir: Path) -> None:
     echo("旧缓存已清理，本次构建将重新生成自动链接配置")
 
 
-def _构建并处理apk(variant: str, gradle_task: str) -> int:
+def _选择APK架构配置(ns: argparse.Namespace) -> list[str]:
+    if ns.all:
+        return 全量APK架构构建顺序.copy()
+
+    selected: list[str] = []
+    for attr_name, profile_key in (
+        ("x86_all", "x86-all"),
+        ("arm64_all", "arm64-all"),
+        ("x86", "x86"),
+        ("x86_64", "x86_64"),
+        ("arm_v8a", "arm-v8a"),
+        ("arm_v7a", "arm-v7a"),
+    ):
+        if getattr(ns, attr_name, False):
+            selected.append(profile_key)
+
+    return selected or ["all"]
+
+
+def _获取apk输出目录(android_dir: Path, variant: str) -> Optional[Path]:
+    apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / variant
+    custom_build_root = _get_custom_build_dir(android_dir)
+    apk_dir_custom = None
+    if custom_build_root:
+        apk_dir_custom = custom_build_root / "outputs" / "apk" / variant
+
+    if apk_dir_default.exists():
+        return apk_dir_default
+    if apk_dir_custom and apk_dir_custom.exists():
+        return apk_dir_custom
+    return None
+
+
+def _查找最新apk(apk_dir: Path) -> Optional[Path]:
+    apks = [
+        apk for apk in apk_dir.glob("*.apk")
+        if not apk.name.endswith("-unaligned.apk")
+    ]
+    if not apks:
+        return None
+    return max(apks, key=lambda item: item.stat().st_mtime)
+
+
+def _获取架构归档目录(android_dir: Path, variant: str) -> Path:
+    return ROBOT_PHONE / ".cache" / "apk" / variant / "architectures"
+
+
+def _构建并处理apk(variant: str, gradle_task: str, profile_key: str) -> Optional[Path]:
     android_dir = ROBOT_PHONE / "android"
     gradlew = android_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
     if not gradlew.exists():
         print(f"未找到 gradlew: {gradlew}")
-        return 1
+        return None
+
+    profile = APK架构配置[profile_key]
+    architectures = ",".join(profile["architectures"])
     _预清理陈旧android缓存(android_dir)
-    echo(f"开始构建 Android {variant.capitalize()} APK")
+    echo(
+        f"开始构建 Android {variant.capitalize()} APK"
+        f"（{profile['label']}，架构: {architectures}）"
+    )
     result = subprocess.run(
-        [str(gradlew), gradle_task],
+        [str(gradlew), gradle_task, f"-PreactNativeArchitectures={architectures}"],
         cwd=android_dir,
     )
     if result.returncode != 0:
         print("构建失败")
-        return result.returncode
+        return None
 
-    apk_dir_default = android_dir / "app" / "build" / "outputs" / "apk" / variant
-    apk_dir_custom = None
-    custom_build_root = _get_custom_build_dir(android_dir)
-    if custom_build_root:
-        apk_dir_custom = custom_build_root / "outputs" / "apk" / variant
+    apk_dir = _获取apk输出目录(android_dir, variant)
+    if not apk_dir or not apk_dir.exists():
+        print(f"构建成功，但未找到 APK 输出目录: {apk_dir}")
+        return None
 
-    apk_dir = None
-    if apk_dir_default.exists():
-        apk_dir = apk_dir_default
-    elif apk_dir_custom and apk_dir_custom.exists():
-        apk_dir = apk_dir_custom
+    source_apk = _查找最新apk(apk_dir)
+    if source_apk is None:
+        print(f"构建成功，但在 {apk_dir} 未找到 APK 文件")
+        return None
 
-    if apk_dir and apk_dir.exists():
-        apks = list(apk_dir.glob("*.apk"))
-        if apks:
-            size_mb = round(apks[0].stat().st_size / 1024 / 1024, 2)
-            print(f"构建成功: {apks[0]}  [{size_mb} MB]")
-            print(f"正在打开输出目录: {apk_dir}")
-            _打开目录(apk_dir)
-        else:
-            print(f"构建成功，但在 {apk_dir} 未找到 APK 文件")
-    else:
-        print(f"构建成功，但未找到 APK 输出目录，检查过: {apk_dir_default} 和 {apk_dir_custom}")
+    archive_dir = _获取架构归档目录(android_dir, variant)
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    target_apk = archive_dir / f"{source_apk.stem}-{profile['suffix']}{source_apk.suffix}"
+    shutil.copy2(source_apk, target_apk)
+
+    size_mb = round(target_apk.stat().st_size / 1024 / 1024, 2)
+    print(f"构建成功: {target_apk}  [{size_mb} MB]")
+    return target_apk
+
+
+def _批量构建apk(variant: str, gradle_task: str, profile_keys: list[str]) -> int:
+    outputs: list[Path] = []
+    total = len(profile_keys)
+    for index, profile_key in enumerate(profile_keys, start=1):
+        profile = APK架构配置[profile_key]
+        print(f"\n[{index}/{total}] 准备构建 {profile['label']}")
+        output = _构建并处理apk(variant, gradle_task, profile_key)
+        if output is None:
+            return 1
+        outputs.append(output)
+
+    print("\n构建完成，产物列表:")
+    for output in outputs:
+        size_mb = round(output.stat().st_size / 1024 / 1024, 2)
+        print(f"  - {output.name} [{size_mb} MB]")
+
+    print(f"正在打开输出目录: {outputs[0].parent}")
+    _打开目录(outputs[0].parent)
     return 0
 
 
-def build_apk_debug() -> int:
-    return _构建并处理apk("debug", "assembleDebug")
+def build_apk_debug(profile_keys: list[str]) -> int:
+    return _批量构建apk("debug", "assembleDebug", profile_keys)
 
 
-def build_apk_release() -> int:
-    return _构建并处理apk("release", "assembleRelease")
+def build_apk_release(profile_keys: list[str]) -> int:
+    return _批量构建apk("release", "assembleRelease", profile_keys)
 
 
 def _修复hermes_win64() -> None:
@@ -572,7 +698,7 @@ def _准备并放置机器人套件() -> bool:
     return True
 
 
-def build_apk(build_type: str) -> int:
+def build_apk(build_type: str, ns: argparse.Namespace) -> int:
     """
     根据构建类型调用具体的构建函数
     :param build_type: "debug", "release", 或 "unknown"
@@ -580,14 +706,15 @@ def build_apk(build_type: str) -> int:
     if not _准备并放置机器人套件():
         return 1
     _修复hermes_win64()
+    profile_keys = _选择APK架构配置(ns)
     if build_type == "debug":
-        return build_apk_debug()
+        return build_apk_debug(profile_keys)
     elif build_type == "release":
-        return build_apk_release()
+        return build_apk_release(profile_keys)
     else:
         # 如果未指定 --debug 或 --release，默认构建 Release 版本
         print("未指定构建类型，默认构建 Release 版本")
-        return build_apk_release()
+        return build_apk_release(profile_keys)
 
 
 def start_metro() -> List[Tuple[str, int]]:
@@ -742,7 +869,7 @@ def main() -> int:
                 kill_port(8081)
 
     if action == "build_apk":
-        return build_apk(build_type)
+        return build_apk(build_type, ns)
 
     if action == "update_version":
         return update_version(ns)
