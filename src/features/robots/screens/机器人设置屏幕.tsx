@@ -416,9 +416,9 @@ export function RobotSettingsScreen() {
   );
 
   const executeSshAndThrow = useCallback(
-    async (title: string, command: string) => {
+    async (title: string, command: string, timeoutSeconds = 180) => {
       try {
-        await SparkSsh.execute(command, 180);
+        return await SparkSsh.execute(command, timeoutSeconds);
       } catch (e: any) {
         throw new Error(`${title}失败: ${e.message || String(e)}`);
       }
@@ -673,7 +673,7 @@ export function RobotSettingsScreen() {
               ) : (
                 <InfoRow label="云端版本" value="暂无可用安装包" />
               )}
-              <InfoRow label="安装模式" value="整包下载后按 common ➡ server ➡ agent ➡ ros ➡ runtime 安装" />
+              <InfoRow label="安装模式" value="整包下载后按 manifest.json 动态安装" />
               {installProgress ? (
                 <InfoRow label="安装进度" value={installProgress} />
               ) : null}

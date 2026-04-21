@@ -12,6 +12,44 @@ from typing import Literal
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PACKAGES_DIR = PROJECT_ROOT / ".cache" / "robot-packages"
 
+本体项目清单 = [
+    {
+        "id": "sparkrobot-common",
+        "title": "SparkRobot Common",
+        "archive_name": "sparkrobot-common.tar.gz",
+        "install_mode": "python-editable",
+        "remote_dir_name": "sparkrobot-common",
+    },
+    {
+        "id": "robot-server",
+        "title": "Robot Server",
+        "archive_name": "robot-server.tar.gz",
+        "install_mode": "python-service",
+        "remote_dir_name": "robot-server",
+    },
+    {
+        "id": "robot-agent",
+        "title": "Robot Agent",
+        "archive_name": "robot-agent.tar.gz",
+        "install_mode": "python-service",
+        "remote_dir_name": "robot-agent",
+    },
+    {
+        "id": "robot-ros",
+        "title": "Robot ROS",
+        "archive_name": "robot-ros.tar.gz",
+        "install_mode": "ros-workspace",
+        "remote_dir_name": "robot-ros",
+    },
+    {
+        "id": "robot-runtime",
+        "title": "Robot Runtime",
+        "archive_name": "robot-runtime.tar.gz",
+        "install_mode": "python-service",
+        "remote_dir_name": "robot-runtime",
+    },
+]
+
 忽略模式 = [
     "__pycache__", "*.pyc", "*.pyo", "*.pyd",
     "*.egg-info", ".git", ".idea", ".vscode",
@@ -138,12 +176,21 @@ def 获取本体项目列表() -> list[tuple[str, Path]]:
     """返回手机端首次安装所需的本体项目目录。"""
     robot_onboard_root = 获取robot_onboard根目录()
     return [
-        ("sparkrobot-common", robot_onboard_root / "sparkrobot-common"),
-        ("robot-server", robot_onboard_root / "robot-server"),
-        ("robot-agent", robot_onboard_root / "robot-agent"),
-        ("robot-runtime", robot_onboard_root / "robot-runtime"),
-        ("robot-ros", robot_onboard_root / "robot-ros"),
+        (item["id"], robot_onboard_root / item["id"]) for item in 本体项目清单
     ]
+
+
+def 构建整包清单(project_names: list[str], bundle_ext: str) -> dict:
+    """根据项目名生成整包 manifest。"""
+    item_by_id = {item["id"]: item for item in 本体项目清单}
+    selected_items = [item_by_id[name] for name in project_names if name in item_by_id]
+    return {
+        "bundle": "robot-full",
+        "install_order": [item["id"] for item in selected_items],
+        "items": selected_items,
+        "package_archive_ext": ".tar.gz",
+        "bundle_archive_ext": bundle_ext,
+    }
 
 
 def 打包robot_agent套件(archive_format: str, ext: str) -> list[Path]:
@@ -168,12 +215,7 @@ def 打包robot_agent套件(archive_format: str, ext: str) -> list[Path]:
         if not bundled_names:
             return []
 
-        manifest = {
-            "bundle": "robot-full",
-            "projects": bundled_names,
-            "package_archive_ext": ".tar.gz",
-            "bundle_archive_ext": ext,
-        }
+        manifest = 构建整包清单(bundled_names, ext)
         (temp_dir / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2),
             encoding="utf-8",

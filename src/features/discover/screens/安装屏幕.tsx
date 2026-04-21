@@ -17,8 +17,6 @@ import { Screen } from '../../../shared/ui/Screen';
 import { Toast } from '../../../shared/ui/Toast';
 import {
   installFullPackageFromBase64,
-  PACKAGE_INSTALL_ORDER,
-  PACKAGE_INSTALL_SPECS,
 } from '../../robots/services/机器人软件包安装服务';
 
 type SshConfig = {
@@ -110,11 +108,11 @@ export function FirstInstallScreen() {
       try {
         const output = await SparkSsh.execute(command, timeoutSeconds);
         appendLog({ title, output, isError: false });
-        return true;
+        return output;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         appendLog({ title, output: msg, isError: true });
-        return false;
+        throw new Error(msg);
       }
     },
     [appendLog],
@@ -200,10 +198,7 @@ export function FirstInstallScreen() {
 
   const executeAndThrow = useCallback(
     async (title: string, command: string, timeoutSeconds = 120) => {
-      const ok = await executeAndLog(title, command, timeoutSeconds);
-      if (!ok) {
-        throw new Error(title);
-      }
+      return executeAndLog(title, command, timeoutSeconds);
     },
     [executeAndLog],
   );
@@ -305,7 +300,7 @@ export function FirstInstallScreen() {
             `nmcli device wifi connect ${ssidArg} password ${passwordArg} ifname wlan0`,
           ),
           120,
-        ))
+        ).then(() => true).catch(() => false))
       ) {
         Toast.show('连接 WiFi 失败');
         return;
@@ -626,37 +621,21 @@ export function FirstInstallScreen() {
               <View
                 style={[styles.divider, { backgroundColor: palette.border }]}
               />
-              {PACKAGE_INSTALL_ORDER.map((type, idx) => {
-                const isLast = idx === PACKAGE_INSTALL_ORDER.length - 1;
-                const spec = PACKAGE_INSTALL_SPECS[type];
-                return (
-                  <React.Fragment key={spec.key}>
-                    <View style={styles.configRow}>
-                      <Text
-                        style={[
-                          styles.orderLabel,
-                          { color: palette.textMuted },
-                        ]}
-                      >
-                        {spec.title}
-                      </Text>
-                      <Text
-                        style={[styles.configValue, { color: palette.text }]}
-                      >
-                        {spec.name}
-                      </Text>
-                    </View>
-                    {!isLast && (
-                      <View
-                        style={[
-                          styles.divider,
-                          { backgroundColor: palette.border },
-                        ]}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+              <View style={styles.configRow}>
+                <Text
+                  style={[
+                    styles.orderLabel,
+                    { color: palette.textMuted },
+                  ]}
+                >
+                  安装来源
+                </Text>
+                <Text
+                  style={[styles.configValue, { color: palette.text }]}
+                >
+                  以整包 manifest.json 为准
+                </Text>
+              </View>
             </>
           )}
         </View>
