@@ -1,8 +1,10 @@
 """robot-agent 套件打包工具"""
 
 import fnmatch
+import json
 import os
 import tarfile
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Literal
@@ -13,7 +15,7 @@ PACKAGES_DIR = PROJECT_ROOT / ".cache" / "robot-packages"
 忽略模式 = [
     "__pycache__", "*.pyc", "*.pyo", "*.pyd",
     "*.egg-info", ".git", ".idea", ".vscode",
-    ".DS_Store", "node_modules", "dist", "build",
+    ".DS_Store", "node_modules", "dist", "build", "install", "log",
     ".mypy_cache", ".ruff_cache",
 ]
 
@@ -42,7 +44,7 @@ def 解析压缩格式(raw_value: str) -> tuple[str, str]:
     if value in format_mapping:
         return format_mapping[value]
 
-    print("✗ 未识别的压缩格式，已使用默认 tar.gz")
+    print("[ERR] 未识别的压缩格式，已使用默认 tar.gz")
     return "gztar", ".tar.gz"
 
 
@@ -121,7 +123,7 @@ def 获取robot_onboard根目录() -> Path:
 def 打包单个项目(name: str, source_dir: Path, package_ext: str | None = None) -> Path | None:
     """按指定扩展名打包单个项目"""
     if not source_dir.exists():
-        print(f"✗ 找不到目录: {source_dir}")
+        print(f"[ERR] 找不到目录: {source_dir}")
         return None
 
     archive_format, ext = 解析压缩格式(package_ext or "tar.gz")
@@ -132,37 +134,60 @@ def 打包单个项目(name: str, source_dir: Path, package_ext: str | None = No
     return output_path
 
 
-def 获取robot_agent项目列表() -> list[tuple[str, Path]]:
-    """返回 robot-agent 相关项目目录"""
+def 获取本体项目列表() -> list[tuple[str, Path]]:
+    """返回手机端首次安装所需的本体项目目录。"""
     robot_onboard_root = 获取robot_onboard根目录()
     return [
-        ("robot-agent", robot_onboard_root / "robot-agent"),
-        ("robot-server", robot_onboard_root / "robot-server"),
         ("sparkrobot-common", robot_onboard_root / "sparkrobot-common"),
+        ("robot-server", robot_onboard_root / "robot-server"),
+        ("robot-agent", robot_onboard_root / "robot-agent"),
+        ("robot-runtime", robot_onboard_root / "robot-runtime"),
+        ("robot-ros", robot_onboard_root / "robot-ros"),
     ]
 
 
 def 打包robot_agent套件(archive_format: str, ext: str) -> list[Path]:
-    """打包 robot-agent 相关项目"""
+    """打包手机端首次安装所需的 full 整包。"""
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
-    outputs: list[Path] = []
+    output_path = PACKAGES_DIR / f"robot-full{ext}"
 
-    for name, path in 获取robot_agent项目列表():
-        if not path.exists():
-            print(f"✗ 找不到目录: {path}")
-            continue
-        output_path = PACKAGES_DIR / f"{name}{ext}"
-        写入压缩包(output_path, path, archive_format)
-        outputs.append(output_path)
-        print(f"✓ 已生成: {output_path}")
+    with tempfile.TemporaryDirectory(prefix="robot-phone-full-") as temp_dir_raw:
+        temp_dir = Path(temp_dir_raw)
+        packages_dir = temp_dir / "packages"
+        packages_dir.mkdir(parents=True, exist_ok=True)
 
-    return outputs
+        bundled_names: list[str] = []
+        for name, path in 获取本体项目列表():
+            if not path.exists():
+                print(f"[ERR] 找不到目录: {path}")
+                continue
+            child_output = packages_dir / f"{name}.tar.gz"
+            写入压缩包(child_output, path, "gztar")
+            bundled_names.append(name)
+
+        if not bundled_names:
+            return []
+
+        manifest = {
+            "bundle": "robot-full",
+            "projects": bundled_names,
+            "package_archive_ext": ".tar.gz",
+            "bundle_archive_ext": ext,
+        }
+        (temp_dir / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        写入压缩包(output_path, temp_dir, archive_format)
+
+    print(f"[OK] 已生成: {output_path}")
+    return [output_path]
 
 
 def 执行打包流程(open_explorer: bool = True, require_prompt: bool = True) -> tuple[str, str, list[Path]]:
-    """执行 robot-agent 套件打包流程"""
+    """执行 robot-onboard 本体整包打包流程"""
     print("\n" + "-" * 50)
-    print("打包 robot-agent 套件")
+    print("打包 robot-onboard 本体整包")
     print("-" * 50)
 
     if require_prompt:
@@ -175,12 +200,12 @@ def 执行打包流程(open_explorer: bool = True, require_prompt: bool = True) 
     outputs = 打包robot_agent套件(archive_format, ext)
     if outputs:
         print("\n" + "=" * 50)
-        print("✓ 打包完成")
+        print("[OK] 打包完成")
         print("=" * 50)
         if open_explorer and hasattr(os, "startfile"):
             os.startfile(str(PACKAGES_DIR))
     else:
         print("\n" + "=" * 50)
-        print("✗ 打包失败")
+        print("[ERR] 打包失败")
         print("=" * 50)
     return archive_format, ext, outputs

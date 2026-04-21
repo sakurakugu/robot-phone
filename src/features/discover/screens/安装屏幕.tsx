@@ -15,9 +15,8 @@ import { usePalette } from '../../../app/theme/palette';
 import { SparkSsh } from '../../../shared/native/SparkSsh';
 import { Screen } from '../../../shared/ui/Screen';
 import { Toast } from '../../../shared/ui/Toast';
-import type { PackageType } from '../../robots/api';
 import {
-  installPackageFromBase64,
+  installFullPackageFromBase64,
   PACKAGE_INSTALL_ORDER,
   PACKAGE_INSTALL_SPECS,
 } from '../../robots/services/机器人软件包安装服务';
@@ -39,7 +38,6 @@ type LogEntry = {
 type PackagePayload = {
   base64: string;
   fileName: string;
-  isGzip: boolean;
 };
 
 export function FirstInstallScreen() {
@@ -168,14 +166,14 @@ export function FirstInstallScreen() {
 
       try {
         const base64 = await read(fileName);
-        return { base64, fileName, isGzip: fileName.endsWith('.tar.gz') };
+        return { base64, fileName };
       } catch (err) {
         if (!fileName.endsWith('.tar.gz')) {
           throw err;
         }
         const fallbackName = fileName.replace(/\.tar\.gz$/, '.tar');
         const base64 = await read(fallbackName);
-        return { base64, fileName: fallbackName, isGzip: false };
+        return { base64, fileName: fallbackName };
       }
     },
     [],
@@ -210,24 +208,6 @@ export function FirstInstallScreen() {
     [executeAndLog],
   );
 
-  const installPackage = useCallback(
-    async (type: PackageType) => {
-      const spec = PACKAGE_INSTALL_SPECS[type];
-      setProgress(`读取 ${spec.title}`);
-      const payload = await getPackageBase64(spec.archiveName);
-      await installPackageFromBase64({
-        type,
-        user: config.user,
-        archiveBase64: payload.base64,
-        archiveFileName: payload.fileName,
-        runRemoteCommand: executeAndThrow,
-        uploadRemoteFile: uploadViaSftpOrThrow,
-        onProgress: setProgress,
-      });
-    },
-    [config.user, executeAndThrow, getPackageBase64, uploadViaSftpOrThrow],
-  );
-
   const handleInstall = useCallback(async () => {
     if (installing) return;
     setHistory([]);
@@ -236,16 +216,16 @@ export function FirstInstallScreen() {
     try {
       const ok = await ensureConnected();
       if (!ok) return;
-      for (const type of PACKAGE_INSTALL_ORDER) {
-        const spec = PACKAGE_INSTALL_SPECS[type];
-        setProgress(`开始 ${spec.title}`);
-        try {
-          await installPackage(type);
-        } catch {
-          Toast.show(`安装 ${spec.name} 失败`);
-          return;
-        }
-      }
+      setProgress('读取整包');
+      const payload = await getPackageBase64('robot-full.tar.gz');
+      await installFullPackageFromBase64({
+        user: config.user,
+        archiveBase64: payload.base64,
+        archiveFileName: payload.fileName,
+        runRemoteCommand: executeAndThrow,
+        uploadRemoteFile: uploadViaSftpOrThrow,
+        onProgress: setProgress,
+      });
       setProgress('安装完成');
       Toast.show('安装完成');
     } catch (err) {
@@ -255,7 +235,7 @@ export function FirstInstallScreen() {
     } finally {
       setInstalling(false);
     }
-  }, [appendLog, ensureConnected, installPackage, installing]);
+  }, [appendLog, config.user, ensureConnected, executeAndThrow, getPackageBase64, installing, uploadViaSftpOrThrow]);
 
   const handleDisconnect = useCallback(async () => {
     try {

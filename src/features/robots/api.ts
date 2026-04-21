@@ -279,12 +279,11 @@ export type ActivePackageInfo = {
   channel: string;
   changelog: string | null;
   uploadedAt: string;
-  agent: PackageFileInfo | null;
-  server: PackageFileInfo | null;
-  common: PackageFileInfo | null;
+  full: PackageFileInfo | null;
 };
 
 export type PackageType = 'agent' | 'server' | 'common';
+export type CloudPackageType = 'full';
 
 /** 获取云端当前活跃安装包信息 */
 export async function getActivePackage(channel = 'stable'): Promise<ActivePackageInfo | null> {
@@ -292,6 +291,6 @@ export async function getActivePackage(channel = 'stable'): Promise<ActivePackag
 }
 
 /** 获取安装包下载 URL（直接指向文件流） */
-export function getPackageDownloadUrl(type: PackageType, channel = 'stable'): string {
+export function getPackageDownloadUrl(type: CloudPackageType, channel = 'stable'): string {
   return `${getApiBaseUrl()}/robot-packages/download/${type}?channel=${channel}`;
 }

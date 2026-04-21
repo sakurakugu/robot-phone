@@ -225,9 +225,9 @@ export class RobotClient {
   }
 
   // 安装包上传
-  async uploadPackage(type: 'agent' | 'server' | 'common', filePath: string): Promise<{ success: boolean; message?: string }> {
-    const filename = `${type}.tar.gz`;
-    const url = `${this.baseUrl}/api/v1/packages/upload?type=${type}`;
+  async uploadPackage(filePath: string): Promise<{ success: boolean; message?: string }> {
+    const filename = 'robot-full.tar.gz';
+    const url = `${this.baseUrl}/api/v1/packages/upload`;
     const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
     if (this.token) {
       headers.Cookie = `session_token=${this.token}`;

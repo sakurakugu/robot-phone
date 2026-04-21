@@ -7,7 +7,7 @@ import { usePalette } from '../../../app/theme/palette';
 import { SparkSsh } from '../../../shared/native/SparkSsh';
 import { Screen } from '../../../shared/ui/Screen';
 import { versionCodeToSemver } from '../../settings/services/updateService';
-import type { ActivePackageInfo, PackageType } from '../api';
+import type { ActivePackageInfo } from '../api';
 import {
     fetchRobot,
     getActivePackage,
@@ -25,9 +25,7 @@ import {
 } from '../components/SettingsComponents';
 import { getOrCreatePhoneDeviceId } from '../device/phoneIdentity';
 import {
-    installPackageFromBase64,
-    PACKAGE_INSTALL_ORDER,
-    PACKAGE_INSTALL_SPECS,
+    installFullPackageFromBase64,
 } from '../services/机器人软件包安装服务';
 import type { RobotForm } from '../types';
 
@@ -203,9 +201,7 @@ export function RobotSettingsScreen() {
   const [downloadingPackages, setDownloadingPackages] = useState(false);
   const [installingPackages, setInstallingPackages] = useState(false);
   const [installProgress, setInstallProgress] = useState('');
-  const [downloadedPackagePaths, setDownloadedPackagePaths] = useState<
-    Partial<Record<PackageType, string>>
-  >({});
+  const [downloadedPackagePath, setDownloadedPackagePath] = useState<string | null>(null);
   const [downloadedVersion, setDownloadedVersion] = useState<string | null>(
     null,
   );
@@ -317,7 +313,7 @@ export function RobotSettingsScreen() {
   }, [loadAudioRoute]);
 
   useEffect(() => {
-    setDownloadedPackagePaths({});
+    setDownloadedPackagePath(null);
     setDownloadedVersion(null);
     setInstalledVersion(null);
   }, [activePackage?.versionCode]);
@@ -393,27 +389,26 @@ export function RobotSettingsScreen() {
   };
 
   const downloadPackageToTemp = useCallback(
-    async (type: PackageType) => {
-      const pkg = activePackage?.[type];
+    async () => {
+      const pkg = activePackage?.full;
       if (!pkg) {
-        throw new Error(`${type} 安装包不存在`);
+        throw new Error('full 安装包不存在');
       }
-      const spec = PACKAGE_INSTALL_SPECS[type];
       const tmpDir = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/tmp`;
       if (!(await ReactNativeBlobUtil.fs.exists(tmpDir))) {
         await ReactNativeBlobUtil.fs.mkdir(tmpDir);
       }
-      const destPath = `${tmpDir}/${spec.archiveName}`;
+      const destPath = `${tmpDir}/robot-full.tar.gz`;
       if (await ReactNativeBlobUtil.fs.exists(destPath)) {
         await ReactNativeBlobUtil.fs.unlink(destPath);
       }
-      const url = getPackageDownloadUrl(type);
+      const url = getPackageDownloadUrl('full');
       const res = await ReactNativeBlobUtil.config({
         path: destPath,
         fileCache: false,
       }).fetch('GET', url);
       if (res.info().status !== 200) {
-        throw new Error(`${spec.title} 下载失败，状态码: ${res.info().status}`);
+        throw new Error(`整包下载失败，状态码: ${res.info().status}`);
       }
       return destPath;
     },
@@ -442,23 +437,6 @@ export function RobotSettingsScreen() {
     [],
   );
 
-  const installSinglePackage = useCallback(
-    async (type: PackageType, localPath: string) => {
-      const spec = PACKAGE_INSTALL_SPECS[type];
-      const base64 = await ReactNativeBlobUtil.fs.readFile(localPath, 'base64');
-      await installPackageFromBase64({
-        type,
-        user: 'firefly',
-        archiveBase64: base64,
-        archiveFileName: spec.archiveName,
-        runRemoteCommand: executeSshAndThrow,
-        uploadRemoteFile: uploadSshAndThrow,
-        onProgress: setInstallProgress,
-      });
-    },
-    [executeSshAndThrow, uploadSshAndThrow],
-  );
-
   const handleInstallAllPackages = useCallback(async () => {
     if (installingPackages || downloadingPackages) return;
     if (!ip) {
@@ -469,16 +447,13 @@ export function RobotSettingsScreen() {
       setMessage('暂无可用安装包');
       return;
     }
-    for (const type of PACKAGE_INSTALL_ORDER) {
-      if (!activePackage[type]) {
-        setMessage(`${type} 安装包不存在，无法一次性安装`);
-        return;
-      }
-      const localPath = downloadedPackagePaths[type];
-      if (!localPath || !(await ReactNativeBlobUtil.fs.exists(localPath))) {
-        setMessage('请先下载全部安装包');
-        return;
-      }
+    if (!activePackage.full) {
+      setMessage('full 安装包不存在，无法安装');
+      return;
+    }
+    if (!downloadedPackagePath || !(await ReactNativeBlobUtil.fs.exists(downloadedPackagePath))) {
+      setMessage('请先下载整包');
+      return;
     }
 
     setInstallingPackages(true);
@@ -488,12 +463,15 @@ export function RobotSettingsScreen() {
       if (!SparkSsh.isConnected()) {
         await SparkSsh.connect(ip, 22, 'firefly', 'firefly');
       }
-      for (const type of PACKAGE_INSTALL_ORDER) {
-        const spec = PACKAGE_INSTALL_SPECS[type];
-        const localPath = downloadedPackagePaths[type]!;
-        setInstallProgress(`安装 ${spec.title}`);
-        await installSinglePackage(type, localPath);
-      }
+      const base64 = await ReactNativeBlobUtil.fs.readFile(downloadedPackagePath, 'base64');
+      await installFullPackageFromBase64({
+        user: 'firefly',
+        archiveBase64: base64,
+        archiveFileName: 'robot-full.tar.gz',
+        runRemoteCommand: executeSshAndThrow,
+        uploadRemoteFile: uploadSshAndThrow,
+        onProgress: setInstallProgress,
+      });
       setInstallProgress('');
       const currentVersion = activePackage
         ? `v${versionCodeToSemver(activePackage.versionCode)}`
@@ -507,11 +485,12 @@ export function RobotSettingsScreen() {
     }
   }, [
     activePackage,
-    downloadedPackagePaths,
+    downloadedPackagePath,
     downloadingPackages,
-    installSinglePackage,
     installingPackages,
     ip,
+    executeSshAndThrow,
+    uploadSshAndThrow,
   ]);
 
   const handleDownloadAllPackages = useCallback(async () => {
@@ -520,23 +499,17 @@ export function RobotSettingsScreen() {
       setMessage('暂无可用安装包');
       return;
     }
-    for (const type of PACKAGE_INSTALL_ORDER) {
-      if (!activePackage[type]) {
-        setMessage(`${type} 安装包不存在，无法一次性下载`);
-        return;
-      }
+    if (!activePackage.full) {
+      setMessage('full 安装包不存在，无法下载');
+      return;
     }
 
     setDownloadingPackages(true);
     setMessage('');
     try {
-      const nextDownloadedPaths: Partial<Record<PackageType, string>> = {};
-      for (const type of PACKAGE_INSTALL_ORDER) {
-        const spec = PACKAGE_INSTALL_SPECS[type];
-        setInstallProgress(`下载 ${spec.title}`);
-        nextDownloadedPaths[type] = await downloadPackageToTemp(type);
-      }
-      setDownloadedPackagePaths(nextDownloadedPaths);
+      setInstallProgress('下载整包');
+      const localPath = await downloadPackageToTemp();
+      setDownloadedPackagePath(localPath);
       const currentVersion = activePackage
         ? `v${versionCodeToSemver(activePackage.versionCode)}`
         : null;
@@ -700,7 +673,7 @@ export function RobotSettingsScreen() {
               ) : (
                 <InfoRow label="云端版本" value="暂无可用安装包" />
               )}
-              <InfoRow label="安装顺序" value="common ➡ server ➡ agent" />
+              <InfoRow label="安装模式" value="整包下载后按 common ➡ server ➡ agent ➡ ros ➡ runtime 安装" />
               {installProgress ? (
                 <InfoRow label="安装进度" value={installProgress} />
               ) : null}
