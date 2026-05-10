@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { usePalette } from '../../../app/theme/palette';
+import type { ControlMode } from '../services/operation';
 
 const MAX_SPEED = 30;
 const SLIDER_WIDTH = 140;
@@ -82,6 +83,7 @@ type RobotOperationSpeedPopoverProps = {
     x: number;
     y: number;
   };
+  controlMode: ControlMode;
   value: number;
   onChange: (value: number) => void;
   onClose: () => void;
@@ -90,11 +92,13 @@ type RobotOperationSpeedPopoverProps = {
 export function RobotOperationSpeedPopover({
   visible,
   position,
+  controlMode,
   value,
   onChange,
   onClose,
 }: RobotOperationSpeedPopoverProps) {
   const palette = usePalette();
+  const speedLabel = controlMode === 'pose' ? '强度' : '速度';
 
   return (
     <Modal
@@ -117,7 +121,7 @@ export function RobotOperationSpeedPopover({
           ]}
         >
           <Text style={[styles.speedPopoverLabel, { color: palette.text }]}>
-            速度
+            {speedLabel}
           </Text>
           <SpeedSlider value={value} onChange={onChange} />
         </View>

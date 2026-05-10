@@ -139,6 +139,7 @@ export function RobotOperationScreen() {
       <RobotOperationSpeedPopover
         visible={screenState.speedPopoverVisible}
         position={screenState.speedPopoverPos}
+        controlMode={screenState.controlMode}
         value={screenState.speed}
         onChange={screenState.setSpeed}
         onClose={() => screenState.setSpeedPopoverVisible(false)}

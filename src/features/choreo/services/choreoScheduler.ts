@@ -1,7 +1,7 @@
 /**
  * 编舞调度器
  * 根据 ExecutionPlan 按时间精确派发动作指令到 D1 机器狗
- * 通过 ws://ip:8082 直连发送 control_command
+ * 通过 ws://ip:8082 直连发送 action_command
  */
 
 import type { ExecutionPlan, ScheduledAction } from '../types';
@@ -182,11 +182,11 @@ export class ChoreoScheduler {
     const ws = this.wsMap.get(robotId);
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
-        type: 'control_command',
+        type: 'action_command',
         data: {
-          command: 'action',
-          action: actionName,
+          action_name: actionName,
           parameters: parameters || {},
+          source: 'phone-choreo',
         },
       }));
     }

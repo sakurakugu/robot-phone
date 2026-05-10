@@ -9,7 +9,7 @@
  *   ↑ role=ui  = 标识本端是 UI 客户端（机器狗端使用 role=robot）
  *
  * 支持的消息类型：
- *   发送：text_input（→大模型）/ tts_input（→机器狗语音）/ action_input（→动作指令）
+ *   发送：text_input（→大模型）/ tts_input（→机器狗语音）/ action_command（→动作指令）
  *   接收：text_response / asr_transcript / error
  *
  * 特性：连接超时检测、断线自动重连（指数退避，最多 5 次）
@@ -275,7 +275,16 @@ export function useRobotWebSocket(): UseRobotWebSocketResult {
   /** 发送动作指令 */
   const sendAction = useCallback(
     (action: string, parameters: Record<string, any> = {}) => {
-      sendRaw({ type: 'action_input', robotId: robotIdRef.current, timestamp: Date.now(), data: { action, parameters } });
+      sendRaw({
+        type: 'action_command',
+        robotId: robotIdRef.current,
+        timestamp: Date.now(),
+        data: {
+          action_name: action,
+          parameters,
+          source: 'phone-chat',
+        },
+      });
     },
     [sendRaw],
   );

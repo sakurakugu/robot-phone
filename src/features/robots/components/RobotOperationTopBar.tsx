@@ -76,6 +76,7 @@ export function RobotOperationTopBar({
   onToggleMic,
 }: RobotOperationTopBarProps) {
   const palette = usePalette();
+  const speedLabel = controlMode === 'pose' ? '强度' : '速度';
 
   const dogOnlineColor = dogTelemetry.online
     ? palette.success
@@ -128,7 +129,7 @@ export function RobotOperationTopBar({
           onPress={onOpenSpeedPopover}
         >
           <Text style={[styles.speedText, { color: palette.text }]}>
-            速度 {speed}
+            {speedLabel} {speed}
           </Text>
         </Pressable>
 

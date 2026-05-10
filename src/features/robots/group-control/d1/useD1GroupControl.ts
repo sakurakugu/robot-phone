@@ -105,14 +105,28 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
 
   const broadcastMergedJoystick = useCallback(
     (mode: D1ControlMode, speed = 5) => {
-      const [axis0, axis1, axis2, axis3] = joystickAxesRef.current;
+      const [axis0, axis1, axis2] = joystickAxesRef.current;
+      const speedRatio = Math.max(0, Math.min(1, speed / 30));
+      const velocity = mode === 'pose'
+        ? {
+            vx: 0,
+            vy: 0,
+            wz: 0,
+          }
+        : {
+            vx: axis0 * 3.0 * speedRatio,
+            vy: axis1 * 1.0 * speedRatio,
+            wz: axis2 * 3.0 * speedRatio,
+          };
       broadcast({
-        type: 'control_command',
+        type: 'manual_command',
         data: {
-          command: 'joystick',
+          command: 'update_velocity',
           mode,
-          speed,
-          joystick: [axis0, axis1, axis2, axis3],
+          vx: velocity.vx,
+          vy: velocity.vy,
+          wz: velocity.wz,
+          source: 'phone-group-control',
         },
       });
     },
@@ -164,8 +178,8 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
   const sendAction = useCallback(
     (action: string, parameters: Record<string, unknown> = {}) => {
       broadcast({
-        type: 'control_command',
-        data: { command: 'action', action, parameters },
+        type: 'action_command',
+        data: { action_name: action, parameters, source: 'phone-group-control' },
       });
     },
     [broadcast],
@@ -174,8 +188,15 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
   const sendSwitchMode = useCallback(
     (mode: D1ControlMode) => {
       broadcast({
-        type: 'control_command',
-        data: { command: 'switch_control_mode', mode },
+        type: 'manual_command',
+        data: {
+          command: 'update_velocity',
+          mode,
+          vx: 0,
+          vy: 0,
+          wz: 0,
+          source: 'phone-group-control',
+        },
       });
     },
     [broadcast],
@@ -183,8 +204,8 @@ export function useD1GroupControl(ips: string[]): UseD1GroupControlResult {
 
   const sendEstop = useCallback(() => {
     broadcast({
-      type: 'control_command',
-      data: { command: 'estop' },
+      type: 'manual_command',
+      data: { command: 'emergency_stop', enabled: true, source: 'phone-group-control' },
     });
   }, [broadcast]);
 
