@@ -14,6 +14,22 @@ import urllib.request
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+from scripts.robot.package_builder import 执行打包流程
+from scripts.start.utils import (
+    LOGS_DIR,
+    ROOT,
+    spawn,
+    run,
+    write_pid,
+    kill_pid_file,
+    确保node_modules存在,
+    检查端口是否被占用,
+    检查运行环境,
+    pkill_patterns,
+    kill_port,
+    持续监控直到中断,
+)
+
 
 def _配置标准流编码() -> None:
     """Windows 下统一使用 UTF-8 输出，避免表情符号触发编码异常"""
@@ -30,21 +46,6 @@ def _配置标准流编码() -> None:
 
 
 _配置标准流编码()
-
-from scripts.robot.package_builder import 执行打包流程
-from scripts.start.utils import (
-    LOGS_DIR,
-    ROOT,
-    spawn,
-    write_pid,
-    kill_pid_file,
-    确保node_modules存在,
-    检查端口是否被占用,
-    检查运行环境,
-    pkill_patterns,
-    kill_port,
-    持续监控直到中断,
-)
 
 ROBOT_PHONE = ROOT
 SCRIPT_NAME = Path(__file__).name
@@ -698,11 +699,42 @@ def _准备并放置机器人套件() -> bool:
     return True
 
 
+def _确保安卓构建依赖完整() -> bool:
+    """构建 APK 前检查 React Native Android 关键依赖，缺失时自动补装。"""
+    node_modules_dir = ROBOT_PHONE / "node_modules"
+    gradle_plugin_dir = node_modules_dir / "@react-native" / "gradle-plugin"
+
+    if gradle_plugin_dir.exists():
+        print("Android 构建依赖检查通过")
+        return True
+
+    if not node_modules_dir.exists():
+        确保node_modules存在(ROBOT_PHONE, legacy_peer_deps=True)
+    else:
+        echo("检测到 Android 构建依赖不完整，正在自动修复 npm 依赖")
+        print(f"缺失目录: {gradle_plugin_dir}")
+        try:
+            run(["npm", "install", "--legacy-peer-deps"], cwd=ROBOT_PHONE)
+        except subprocess.CalledProcessError as exc:
+            print(f"自动安装依赖失败，返回码: {exc.returncode}")
+            return False
+
+    if not gradle_plugin_dir.exists():
+        print("依赖安装完成，但仍未找到 React Native Gradle 插件目录")
+        print(f"期望目录: {gradle_plugin_dir}")
+        return False
+
+    print("Android 构建依赖已自动修复")
+    return True
+
+
 def build_apk(build_type: str, ns: argparse.Namespace) -> int:
     """
     根据构建类型调用具体的构建函数
     :param build_type: "debug", "release", 或 "unknown"
     """
+    if not _确保安卓构建依赖完整():
+        return 1
     if not _准备并放置机器人套件():
         return 1
     _修复hermes_win64()
