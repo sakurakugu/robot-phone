@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import RNBlobUtil from 'react-native-blob-util';
 import type { AudioStreamState } from '../services/robotChat';
 import type { WsMessage } from './useRobotWebSocket';
+import NativeSparkPcmAudio from '../../../shared/native/NativeSparkPcmAudio';
 
 function trimConversationSet(target: Set<string>) {
   if (target.size <= 200) {
@@ -22,6 +24,10 @@ export function useRobotChatAudio() {
   const playedConversationRef = useRef<Set<string>>(new Set());
   const streamConversationRef = useRef<Set<string>>(new Set());
   const audioStreamRef = useRef<Map<string, AudioStreamState>>(new Map());
+  const nativeStreamSessionRef = useRef<string | null>(null);
+  const supportsNativePcmStreamRef = useRef(
+    Platform.OS === 'android' && NativeSparkPcmAudio !== null,
+  );
 
   const playNextAudio = useCallback(() => {
     if (isAudioPlayingRef.current) {
@@ -85,6 +91,12 @@ export function useRobotChatAudio() {
         ? streamState.stagedChunks.splice(0, streamState.stagedChunks.length)
         : streamState.stagedChunks.splice(0, 1);
       if (toPlay.length === 0) {
+        return;
+      }
+      if (streamState.useNativeStream) {
+        toPlay.forEach(base64 => {
+          NativeSparkPcmAudio?.appendChunk(base64);
+        });
         return;
       }
       toPlay.forEach(base64 => {
@@ -158,6 +170,29 @@ export function useRobotChatAudio() {
           return true;
         }
 
+        const format =
+          typeof payload.format === 'string' && payload.format
+            ? payload.format
+            : 'mp3';
+        const sampleRateValue =
+          typeof payload.sampleRate === 'number'
+            ? payload.sampleRate
+            : Number(payload.sampleRate);
+        const sampleRate =
+          Number.isFinite(sampleRateValue) && sampleRateValue > 0
+            ? sampleRateValue
+            : 24000;
+        const channelsValue =
+          typeof payload.channels === 'number'
+            ? payload.channels
+            : Number(payload.channels);
+        const channels =
+          Number.isFinite(channelsValue) && channelsValue > 0
+            ? channelsValue
+            : 1;
+        const useNativeStream =
+          supportsNativePcmStreamRef.current && format.toLowerCase() === 'pcm';
+
         const conversationId =
           typeof data.conversationId === 'string' ? data.conversationId : '';
         if (conversationId) {
@@ -165,11 +200,17 @@ export function useRobotChatAudio() {
           trimConversationSet(streamConversationRef.current);
         }
 
+        if (useNativeStream) {
+          NativeSparkPcmAudio?.reset();
+          NativeSparkPcmAudio?.startStream(sampleRate, channels);
+          nativeStreamSessionRef.current = sessionId;
+        }
+
         audioStreamRef.current.set(sessionId, {
-          format:
-            typeof payload.format === 'string' && payload.format
-              ? payload.format
-              : 'mp3',
+          format,
+          sampleRate,
+          channels,
+          useNativeStream,
           nextSeq: 1,
           pendingBySeq: new Map<number, string>(),
           stagedChunks: [],
@@ -208,6 +249,10 @@ export function useRobotChatAudio() {
         flushStreamAudio(sessionId, true);
 
         const streamState = audioStreamRef.current.get(sessionId);
+        if (streamState?.useNativeStream && nativeStreamSessionRef.current === sessionId) {
+          NativeSparkPcmAudio?.stopStream();
+          nativeStreamSessionRef.current = null;
+        }
         if (streamState?.conversationId) {
           playedConversationRef.current.add(streamState.conversationId);
           trimConversationSet(playedConversationRef.current);
@@ -239,6 +284,8 @@ export function useRobotChatAudio() {
       playedConversations.clear();
       streamConversations.clear();
       audioStreamStates.clear();
+      nativeStreamSessionRef.current = null;
+      NativeSparkPcmAudio?.reset();
     };
   }, []);
 

@@ -24,6 +24,9 @@ export type RobotChatMessage = {
 
 export type AudioStreamState = {
   format: string;
+  sampleRate: number;
+  channels: number;
+  useNativeStream: boolean;
   nextSeq: number;
   pendingBySeq: Map<number, string>;
   stagedChunks: string[];
