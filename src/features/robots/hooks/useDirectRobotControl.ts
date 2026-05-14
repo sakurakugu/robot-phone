@@ -110,34 +110,14 @@ export function useDirectRobotControl(
 
   const sendMergedJoystick = useCallback(
     (mode: DirectControlMode, speed: number = 5) => {
-      const [axis0, axis1, axis2] = joystickAxesRef.current;
-      const speedRatio = Math.max(0, Math.min(1, speed / 30));
-      const velocity = mode === 'two_leg'
-        ? {
-            vx: axis0 * 3.0 * speedRatio,
-            vy: 0,
-            wz: axis1 * 1.0 * speedRatio,
-          }
-        : mode === 'pose'
-          ? {
-              vx: 0,
-              vy: 0,
-              wz: 0,
-            }
-          : {
-              vx: axis0 * 3.0 * speedRatio,
-              vy: axis1 * 1.0 * speedRatio,
-              wz: axis2 * 3.0 * speedRatio,
-            };
+      const [axis0, axis1, axis2, axis3] = joystickAxesRef.current;
       sendRaw({
-        type: 'manual_command',
+        type: 'control_command',
         data: {
-          command: 'update_velocity',
+          command: 'joystick',
           mode,
-          vx: velocity.vx,
-          vy: velocity.vy,
-          wz: velocity.wz,
-          source: 'phone-direct',
+          speed,
+          joystick: [axis0, axis1, axis2, axis3],
         },
       });
     },
@@ -200,8 +180,8 @@ export function useDirectRobotControl(
   const sendAction = useCallback(
     (action: string, parameters: Record<string, unknown> = {}) => {
       sendRaw({
-        type: 'action_command',
-        data: { action_name: action, parameters, source: 'phone-direct' },
+        type: 'control_command',
+        data: { command: 'action', action, parameters },
       });
     },
     [sendRaw],
@@ -209,21 +189,21 @@ export function useDirectRobotControl(
 
   const sendEstop = useCallback(() => {
     sendRaw({
-      type: 'manual_command',
-      data: { command: 'emergency_stop', enabled: true, source: 'phone-direct' },
+      type: 'control_command',
+      data: { command: 'estop' },
     });
   }, [sendRaw]);
 
   const sendMicControl = useCallback((enabled: boolean) => {
     sendRaw({
-      type: 'device_command',
+      type: 'control_command',
       data: { command: 'mic_control', enabled },
     });
   }, [sendRaw]);
 
   const sendSwitchMode = useCallback((mode: DirectControlMode) => {
     sendRaw({
-      type: 'device_command',
+      type: 'control_command',
       data: { command: 'switch_control_mode', mode },
     });
   }, [sendRaw]);
@@ -231,14 +211,14 @@ export function useDirectRobotControl(
   const sendSdkMode = useCallback((enabled: boolean) => {
     const requestId = `sdk_${Date.now()}`;
     sendRaw({
-      type: 'device_command',
+      type: 'control_command',
       data: { command: 'sdk_mode', enabled, requestId },
     });
   }, [sendRaw]);
 
   const sendCameraCapture = useCallback((requestId?: string) => {
     sendRaw({
-      type: 'device_command',
+      type: 'control_command',
       data: { command: 'camera_capture', requestId: requestId ?? `cap_${Date.now()}` },
     });
   }, [sendRaw]);
